@@ -1,0 +1,5 @@
+bin/dist
+bin/config.json
+bin/__debug_bin
+.vscode
+vendor
