@@ -1,5 +1,7 @@
 package config
 
+import "io/fs"
+
 type Config struct {
 	MachineInfo *MachineInfo `json:"machineInfo"`
 	Port        string       `json:"port"`
@@ -13,4 +15,8 @@ type Address struct {
 
 type MachineInfo struct {
 	MachineAddress map[string]*Address `json:"machineAddress"`
+}
+type StaticConfig struct {
+	DirName string
+	Files   fs.FS
 }

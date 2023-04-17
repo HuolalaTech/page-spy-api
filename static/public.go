@@ -1,4 +1,4 @@
-package serve
+package static
 
 import (
 	"io/fs"

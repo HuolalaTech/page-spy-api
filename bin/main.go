@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 
+	"github.com/HuolalaTech/page-spy-api/config"
 	"github.com/HuolalaTech/page-spy-api/serve"
 )
 
@@ -10,7 +11,7 @@ import (
 var publicContent embed.FS
 
 func main() {
-	serve.Run(&serve.StaticConfig{
+	serve.Run(&config.StaticConfig{
 		DirName: "dist",
 		Files:   publicContent,
 	})
