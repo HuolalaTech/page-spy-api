@@ -74,7 +74,7 @@ var upgrader = websocket.Upgrader{
 
 func readClientMessage(ctx context.Context, conn *websocket.Conn, room roomApi.RemoteRoom) error {
 	if room.IsClose() {
-		return fmt.Errorf("room %s is already close", room.GetRoomAddress().ID)
+		return roomApi.NewRoomCloseError("room %s is already close", room.GetRoomAddress().ID)
 	}
 
 	rawMsg := &roomApi.RawMessage{}
@@ -82,21 +82,21 @@ func readClientMessage(ctx context.Context, conn *websocket.Conn, room roomApi.R
 	if err != nil {
 		_, ok := err.(*websocket.CloseError)
 		if ok {
-			return fmt.Errorf("read message websocket error %w", err)
+			return roomApi.NewRoomCloseError("read message websocket error %s", err.Error())
 		}
 
-		writeWebsocketError(conn, fmt.Errorf("读取消息解析错误 %w", err))
+		writeWebsocketError(conn, roomApi.NewRoomCloseError("读取消息解析错误 %s", err.Error()))
 		return nil
 	}
 	msg, err := rawMsg.ToMessage()
 
 	if err != nil {
-		writeWebsocketError(conn, fmt.Errorf("消息转换格式错误%w", err))
+		writeWebsocketError(conn, roomApi.NewRoomCloseError("消息转换格式错误%s", err.Error()))
 		return nil
 	}
 
 	if !roomApi.IsPublicMessageType(msg.Type) {
-		writeWebsocketError(conn, fmt.Errorf("前端不能发送消息类型 %s", msg.Type))
+		writeWebsocketError(conn, roomApi.NewRoomCloseError("前端不能发送消息类型 %s", msg.Type))
 		return nil
 	}
 
@@ -114,20 +114,20 @@ func onRoomMessage(ctx context.Context, conn *websocket.Conn, room roomApi.Remot
 	case msg := <-room.OnMessage():
 		bs, err := json.Marshal(msg)
 		if err != nil {
-			return fmt.Errorf("send message marshal error %w", err)
+			return roomApi.NewMessageContentError("send message marshal error %s", err.Error())
 		}
 
 		err = conn.WriteMessage(websocket.TextMessage, bs)
 		if err != nil {
 			joinLog.WithError(err).Error("send message write message")
-			writeWebsocketError(conn, err)
+			writeWebsocketError(conn, roomApi.NewNetWorkTimeoutError(err.Error()))
 			return nil
 		}
 
 	case <-room.Done():
-		return fmt.Errorf("room %s leave", room.GetRoomAddress().ID)
+		return roomApi.NewRoomCloseError("room %s leave", room.GetRoomAddress().ID)
 	case <-ctx.Done():
-		return fmt.Errorf("room %s context cancel", room.GetRoomAddress().ID)
+		return roomApi.NewNetWorkTimeoutError("room %s context cancel", room.GetRoomAddress().ID)
 	}
 
 	return nil
@@ -288,7 +288,7 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 	userId := r.URL.Query().Get("userId")
 	address, err := eventApi.NewAddressFromID(id)
 	if err != nil {
-		writeWebsocketError(conn, err)
+		writeWebsocketError(conn, roomApi.NewRoomNotFoundError(err.Error()))
 		return
 	}
 

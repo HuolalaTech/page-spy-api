@@ -26,6 +26,6 @@ func NewErrorMessage(err error) *room.Message {
 
 	return &room.Message{
 		Type:    room.ErrorType,
-		Content: &room.ErrorMessageContent{Message: err.Error(), Code: "error"},
+		Content: &room.ErrorMessageContent{Message: err.Error(), Code: room.UnknownError},
 	}
 }
