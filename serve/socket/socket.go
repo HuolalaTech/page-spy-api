@@ -127,7 +127,8 @@ func onRoomMessage(ctx context.Context, conn *websocket.Conn, room roomApi.Remot
 	case <-room.Done():
 		return roomApi.NewRoomCloseError("room %s leave", room.GetRoomAddress().ID)
 	case <-ctx.Done():
-		return roomApi.NewNetWorkTimeoutError("room %s context cancel", room.GetRoomAddress().ID)
+		writeWebsocketError(conn, roomApi.NewNetWorkTimeoutError("room %s context cancel", room.GetRoomAddress().ID))
+		return nil
 	}
 
 	return nil
