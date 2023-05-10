@@ -46,11 +46,6 @@ func initContainer() (*dig.Container, error) {
 			return nil
 		})
 
-		route.GET("/room/create", func(c echo.Context) error {
-			socket.CreateRoom(c.Response(), c.Request())
-			return nil
-		})
-
 		route.GET("/ws/room/join", func(c echo.Context) error {
 			socket.JoinRoom(c.Response(), c.Request())
 			return nil

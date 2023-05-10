@@ -35,6 +35,10 @@ func (r *BasicManager) addRoom(room room.ManagerRoom) {
 func (r *BasicManager) getRoomsByGroup(group string) []room.ManagerRoom {
 	rooms := r.getRooms()
 	ret := []room.ManagerRoom{}
+	if group == "" {
+		return rooms
+	}
+
 	for _, rr := range rooms {
 		if rr.GetInfo() != nil && rr.GetInfo().Group == group {
 			ret = append(ret, rr)
