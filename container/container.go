@@ -52,7 +52,7 @@ func initContainer() (*dig.Container, error) {
 		})
 
 		if staticConfig != nil {
-			e.GET("/*", echo.WrapHandler(http.FileServer(http.FS(&static.FallbackFS{FS: staticConfig.Files, Fallback: staticConfig.DirName + "/index.html"}))), middleware.Rewrite(map[string]string{"/*": "/dist/$1"}))
+			e.GET("/*", echo.WrapHandler(http.FileServer(http.FS(&static.FallbackFS{FS: staticConfig.Files, Fallback: staticConfig.DirName + "/index.html"}))), middleware.Rewrite(map[string]string{"/*": "/dist/$1"}), selfMiddleware.Cache())
 		}
 
 		return e
