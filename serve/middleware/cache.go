@@ -18,7 +18,7 @@ func Cache() echo.MiddlewareFunc {
 			ct := mime.TypeByExtension(filepath.Ext(c.Request().RequestURI))
 			contentControl := c.Response().Header().Get("Cache-Control")
 			if ct != "" && !isHtml(ct) && contentControl == "" {
-				c.Response().Header().Set("Cache-Control", "max-age=2592000")
+				c.Response().Header().Set("Cache-Control", "max-age=86400")
 			}
 
 			err := next(c)
