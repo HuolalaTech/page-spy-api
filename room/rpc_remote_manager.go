@@ -57,11 +57,11 @@ func (r *RemoteRpcRoomManager) GetRooms(ctx context.Context) ([]room.RemoteRoom,
 	return rooms, nil
 }
 
-func (r *RemoteRpcRoomManager) GetRoomsByGroup(ctx context.Context, group string) ([]room.RemoteRoom, error) {
+func (r *RemoteRpcRoomManager) GetRoomsByGroup(ctx context.Context, tags map[string]string) ([]room.RemoteRoom, error) {
 	rooms := make([]room.RemoteRoom, 0)
 	for _, c := range r.rpcManager.GetRpcList() {
 		req := NewRpcLocalRoomManagerRequest()
-		req.Group = group
+		req.Tags = tags
 		res := NewRpcLocalRoomManagerResponse()
 		err := c.Call(ctx, "LocalRpcRoomManager.GetRoomsByGroup", req, res)
 		if err != nil {
@@ -74,8 +74,8 @@ func (r *RemoteRpcRoomManager) GetRoomsByGroup(ctx context.Context, group string
 	return rooms, nil
 }
 
-func (r *RemoteRpcRoomManager) ListRooms(ctx context.Context, group string) ([]*room.Info, error) {
-	rooms, err := r.GetRoomsByGroup(ctx, group)
+func (r *RemoteRpcRoomManager) ListRooms(ctx context.Context, tags map[string]string) ([]*room.Info, error) {
+	rooms, err := r.GetRoomsByGroup(ctx, tags)
 	if err != nil {
 		return nil, err
 	}

@@ -45,8 +45,8 @@ func (r *LocalRoomManager) CreateConnection() (*room.Connection, error) {
 	}, nil
 }
 
-func (r *LocalRoomManager) GetRoomsByGroup(group string) []room.Room {
-	rs := r.getRoomsByGroup(group)
+func (r *LocalRoomManager) GetRoomsByGroup(tags map[string]string) []room.Room {
+	rs := r.getRoomsByTags(tags)
 	rooms := make([]room.Room, 0, len(rs))
 	for _, r := range rs {
 		rooms = append(rooms, r.(*localRoom))

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"runtime/debug"
 
 	eventApi "github.com/HuolalaTech/page-spy-api/api/event"
@@ -233,8 +234,8 @@ type ListRoomParams struct {
 }
 
 func (s *WebSocket) ListRooms(rw http.ResponseWriter, r *http.Request) {
-	group := r.URL.Query().Get("group")
-	rooms, err := s.roomManager.ListRooms(r.Context(), group)
+	tags := getTags(r.URL.Query())
+	rooms, err := s.roomManager.ListRooms(r.Context(), tags)
 	if err != nil {
 		writeResponse(rw, NewErrorResponse(err))
 		return
@@ -250,16 +251,30 @@ type CreateRoomParams struct {
 	Tags     map[string]string `json:"tags"`
 }
 
+func getTags(query url.Values) map[string]string {
+	tags := make(map[string]string, len(query))
+	for k, v := range query {
+		if len(v) > 0 {
+			value := v[0]
+			tags[k] = value
+		}
+	}
+
+	return tags
+}
+
 func (s *WebSocket) CreateRoom(rw http.ResponseWriter, r *http.Request) {
 	address := s.roomManager.AddressManager.GeneratorRoomAddress()
 	name := r.URL.Query().Get("name")
 	group := r.URL.Query().Get("group")
+	tags := getTags(r.URL.Query())
 	if name == "" || group == "" {
 		writeResponse(rw, NewErrorResponse(errors.New("name 或者 group 参数缺失")))
 		return
 	}
 
 	opt := roomApi.NewRoomInfo(name, address.ID, group, address)
+	opt.Tags = tags
 	_, err := s.roomManager.CreateRoom(r.Context(), opt)
 	if err != nil {
 		writeResponse(rw, NewErrorResponse(err))

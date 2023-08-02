@@ -47,6 +47,15 @@ type Message struct {
 	Content interface{} `json:"content"`
 }
 
+func (m *Message) ToString() string {
+	bs, err := json.Marshal(m)
+	if err != nil {
+		return ""
+	}
+
+	return string(bs)
+}
+
 func IsPublicMessageType(messageType string) bool {
 	switch messageType {
 	case BroadcastType, MessageType, PingType:

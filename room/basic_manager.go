@@ -32,16 +32,36 @@ func (r *BasicManager) addRoom(room room.ManagerRoom) {
 	r.roomsMap[room.GetRoomAddress().ID] = room
 }
 
-func (r *BasicManager) getRoomsByGroup(group string) []room.ManagerRoom {
+func equalTags(old map[string]string, new map[string]string) bool {
+	if len(old) <= 0 && len(new) <= 0 {
+		return true
+	}
+
+	if len(new) <= 0 || len(old) <= 0 {
+		return false
+	}
+
+	for k, v := range new {
+		if old[k] != v {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (r *BasicManager) getRoomsByTags(tags map[string]string) []room.ManagerRoom {
 	rooms := r.getRooms()
 	ret := []room.ManagerRoom{}
-	if group == "" {
+	if len(tags) <= 0 {
 		return rooms
 	}
 
 	for _, rr := range rooms {
-		if rr.GetInfo() != nil && rr.GetInfo().Group == group {
-			ret = append(ret, rr)
+		if rr.GetInfo() != nil && len(rr.GetInfo().Tags) > 0 {
+			if equalTags(rr.GetInfo().Tags, tags) {
+				ret = append(ret, rr)
+			}
 		}
 	}
 

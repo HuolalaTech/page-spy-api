@@ -55,7 +55,7 @@ func (res *RpcLocalRoomManagerResponse) GetRooms() []room.RemoteRoom {
 
 type RpcLocalRoomManagerRequest struct {
 	ContextTimeout int
-	Group          string
+	Tags           map[string]string
 	Info           *room.Info
 	Connection     *room.Connection
 }
@@ -67,7 +67,7 @@ func NewRpcLocalRoomManagerRequest() *RpcLocalRoomManagerRequest {
 }
 
 func (r *LocalRpcRoomManager) GetRoomsByGroup(_ *http.Request, req *RpcLocalRoomManagerRequest, res *RpcLocalRoomManagerResponse) error {
-	rooms := r.localRoomManager.GetRoomsByGroup(req.Group)
+	rooms := r.localRoomManager.GetRoomsByGroup(req.Tags)
 	res.SetRooms(rooms)
 	return nil
 }

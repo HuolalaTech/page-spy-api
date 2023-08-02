@@ -73,7 +73,7 @@ func (r *localRoom) Start(ctx context.Context) error {
 				} else {
 					err := r.SendMessage(context.Background(), msg)
 					if err != nil {
-						r.log.WithError(err).Error("广播消息%s错误", msg)
+						r.log.WithError(err).Errorf("广播消息%s错误", msg.ToString())
 					}
 				}
 			case <-r.Done():

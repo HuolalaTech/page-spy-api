@@ -28,7 +28,6 @@ func getAvailablePort(limit int) (string, error) {
 	max := 65535
 	port := rand.Intn(max-min) + min
 
-	fmt.Println(port)
 	// 检查端口号是否可用
 	addr := fmt.Sprintf(":%d", port)
 	listener, err := net.Listen("tcp", addr)
