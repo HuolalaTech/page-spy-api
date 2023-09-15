@@ -37,3 +37,14 @@ func main() {
 }
 
 ```
+
+## 目录结构
+
+- config 		项目配置
+- container 	依赖注入
+- event 		事件结构定义
+- logger 		日志接口
+- metric 		打点接口
+- room 		房间接口
+- rpc			多机器 rpc 接口
+- serve		http websocket 服务

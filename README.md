@@ -2,7 +2,7 @@
 
 page-spy-api is the backend service for page-spy-web, which includes static resource serving, HTTP service, and WebSocket service.
 
-# 如何使用
+# How to use
 
 ```golang
 package main
@@ -37,3 +37,13 @@ func main() {
 }
 
 ```
+
+## Directory Structure
+- config: Project configuration.
+- container: Dependency injection.
+- event: Event structure definitions.
+- logger: Logging interface.
+- metric: Metrics interface.
+- room: Room interface.
+- rpc: Multi-machine RPC interface.
+- serve: HTTP and WebSocket services.
