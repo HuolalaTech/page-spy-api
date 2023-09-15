@@ -22,7 +22,7 @@ var publicContent embed.FS
 func main() {
 	container := container.Container()
 	err := container.Provide(func() *config.StaticConfig {
-		// page-spy-web 构建 dist 结构静态资源代理，如果只使用后端可以 return nil
+		// page-spy-web build dist static proxy, if no need you can return nil
 		return &config.StaticConfig{
 			DirName: "dist",
 			Files:   publicContent,
