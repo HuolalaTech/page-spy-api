@@ -1,6 +1,6 @@
 # README
 
-page-spy-api is the backend service for page-spy-web, which includes static resource serving, HTTP service, and WebSocket service.
+page-spy-api 是 page-spy-web 的后端服务，其中包括静态资源服务，http服务以及 websocket 服务。
 
 # 如何使用
 
