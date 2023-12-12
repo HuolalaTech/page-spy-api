@@ -45,8 +45,7 @@ func NewRpcEventEmitter(localEventEmitter event.EventEmitter, rpcManager *rpc.Rp
 func (e *RpcEventEmitter) Emit(r *http.Request, req *RpcEventEmitterRequest, res *RpcEventEmitterResponse) error {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(req.ContextTimeout)*time.Second)
 	defer cancel()
-
 	err := e.localEventEmitter.EmitLocal(ctx, req.Address, req.Package)
-	res.SetError(err)
-	return nil
+	log.Debugf("rpc serve RpcEventEmitter.Emit from machine: %s room: %s err: %v", req.Address.MachineID, req.Address.ID, err)
+	return res.SetError(err)
 }

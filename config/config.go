@@ -1,6 +1,8 @@
 package config
 
-import "io/fs"
+import (
+	"io/fs"
+)
 
 type CrosConfig struct {
 	AllowOrigins  []string `json:"allowOrigins"`
@@ -10,9 +12,9 @@ type CrosConfig struct {
 }
 
 type Config struct {
-	MachineInfo *MachineInfo `json:"machineInfo"`
-	Port        string       `json:"port"`
-	CrosConfig  *CrosConfig  `json:"crosConfig"`
+	Port       string      `json:"port"`
+	RpcAddress []*Address  `json:"rpcAddress"`
+	CrosConfig *CrosConfig `json:"crosConfig"`
 }
 
 type Address struct {
@@ -20,9 +22,6 @@ type Address struct {
 	Port string `json:"port"`
 }
 
-type MachineInfo struct {
-	MachineAddress map[string]*Address `json:"machineAddress"`
-}
 type StaticConfig struct {
 	DirName string
 	Files   fs.FS

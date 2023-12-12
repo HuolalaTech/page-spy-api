@@ -84,7 +84,7 @@ func (e *LocalEventEmitter) emitRemote(ctx context.Context, address *event.Addre
 		return err
 	}
 
-	return res.Error
+	return res.GetError()
 }
 
 func (e *LocalEventEmitter) EmitLocal(ctx context.Context, address *event.Address, pkg *event.Package) error {

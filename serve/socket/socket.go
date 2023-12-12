@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"runtime/debug"
+	"sync"
 
 	eventApi "github.com/HuolalaTech/page-spy-api/api/event"
 	roomApi "github.com/HuolalaTech/page-spy-api/api/room"
@@ -59,9 +60,34 @@ func writeResponse(w http.ResponseWriter, res *Response) {
 	}
 }
 
-func writeWebsocketError(conn *websocket.Conn, errRes error) {
+type socket struct {
+	rwLock sync.RWMutex
+	conn   *websocket.Conn
+}
+
+func (s *socket) WriteMessage(messageType int, data []byte) error {
+	return s.conn.WriteMessage(messageType, data)
+}
+
+func (s *socket) WriteJSON(v interface{}) error {
+	s.rwLock.Lock()
+	defer s.rwLock.Unlock()
+	return s.conn.WriteJSON(v)
+}
+
+func (s *socket) ReadJSON(v interface{}) error {
+	s.rwLock.RLock()
+	defer s.rwLock.RUnlock()
+	return s.conn.ReadJSON(v)
+}
+
+func (s *socket) writeWebsocketError(errRes error) {
 	message := NewErrorMessage(errRes)
-	err := conn.WriteJSON(message)
+	if message == nil {
+		return
+	}
+
+	err := s.WriteJSON(message)
 	if err != nil {
 		joinLog.WithError(err).Error("write websocket  message error")
 	}
@@ -73,44 +99,44 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func readClientMessage(ctx context.Context, conn *websocket.Conn, room roomApi.RemoteRoom) error {
+func readClientMessage(ctx context.Context, socket *socket, room roomApi.RemoteRoom) error {
 	if room.IsClose() {
 		return roomApi.NewRoomCloseError("room %s is already close", room.GetRoomAddress().ID)
 	}
 
 	rawMsg := &roomApi.RawMessage{}
-	err := conn.ReadJSON(rawMsg)
+	err := socket.ReadJSON(rawMsg)
 	if err != nil {
 		_, ok := err.(*websocket.CloseError)
 		if ok {
 			return roomApi.NewRoomCloseError("read message websocket error %s", err.Error())
 		}
 
-		writeWebsocketError(conn, roomApi.NewRoomCloseError("读取消息解析错误 %s", err.Error()))
+		socket.writeWebsocketError(roomApi.NewRoomCloseError("读取消息解析错误 %s", err.Error()))
 		return nil
 	}
 	msg, err := rawMsg.ToMessage()
 
 	if err != nil {
-		writeWebsocketError(conn, roomApi.NewRoomCloseError("消息转换格式错误%s", err.Error()))
+		socket.writeWebsocketError(roomApi.NewRoomCloseError("消息转换格式错误%s", err.Error()))
 		return nil
 	}
 
 	if !roomApi.IsPublicMessageType(msg.Type) {
-		writeWebsocketError(conn, roomApi.NewRoomCloseError("前端不能发送消息类型 %s", msg.Type))
+		socket.writeWebsocketError(roomApi.NewRoomCloseError("前端不能发送消息类型 %s", msg.Type))
 		return nil
 	}
-
+	log.Debugf("socket 接受信息 %s", msg.Type)
 	err = room.SendMessage(ctx, msg)
 	if err != nil {
-		writeWebsocketError(conn, err)
+		socket.writeWebsocketError(err)
 		return nil
 	}
 
 	return nil
 }
 
-func onRoomMessage(ctx context.Context, conn *websocket.Conn, room roomApi.RemoteRoom) error {
+func onRoomMessage(ctx context.Context, socket *socket, room roomApi.RemoteRoom) error {
 	select {
 	case msg := <-room.OnMessage():
 		bs, err := json.Marshal(msg)
@@ -118,29 +144,29 @@ func onRoomMessage(ctx context.Context, conn *websocket.Conn, room roomApi.Remot
 			return roomApi.NewMessageContentError("send message marshal error %s", err.Error())
 		}
 
-		err = conn.WriteMessage(websocket.TextMessage, bs)
+		err = socket.WriteMessage(websocket.TextMessage, bs)
 		if err != nil {
 			joinLog.WithError(err).Error("send message write message")
-			writeWebsocketError(conn, roomApi.NewNetWorkTimeoutError(err.Error()))
+			socket.writeWebsocketError(roomApi.NewNetWorkTimeoutError(err.Error()))
 			return nil
 		}
 
 	case <-room.Done():
 		return roomApi.NewRoomCloseError("room %s leave", room.GetRoomAddress().ID)
 	case <-ctx.Done():
-		writeWebsocketError(conn, roomApi.NewNetWorkTimeoutError("room %s context cancel", room.GetRoomAddress().ID))
+		socket.writeWebsocketError(roomApi.NewNetWorkTimeoutError("room %s context cancel", room.GetRoomAddress().ID))
 		return nil
 	}
 
 	return nil
 }
 
-func (s *WebSocket) serveRoom(opt *roomApi.Info, connection *roomApi.Connection, conn *websocket.Conn, room roomApi.RemoteRoom) {
+func (s *WebSocket) serveRoom(opt *roomApi.Info, connection *roomApi.Connection, socket *socket, room roomApi.RemoteRoom) {
 	retCode := "success"
 	close := func() {
 		err := s.roomManager.LeaveRoom(context.Background(), opt, connection)
 		if err != nil {
-			joinLog.Errorf("serveRoom %s close %w code %s", opt.Address.ID, err, retCode)
+			joinLog.Errorf("serveRoom %s close %v code %s", opt.Address.ID, err, retCode)
 		}
 	}
 
@@ -157,7 +183,7 @@ func (s *WebSocket) serveRoom(opt *roomApi.Info, connection *roomApi.Connection,
 		close()
 	}()
 
-	conn.SetCloseHandler(func(code int, text string) error {
+	socket.conn.SetCloseHandler(func(code int, text string) error {
 		cancel()
 		retCode = "remote_close"
 		return nil
@@ -186,10 +212,10 @@ func (s *WebSocket) serveRoom(opt *roomApi.Info, connection *roomApi.Connection,
 				writeCode = "room_close"
 				return
 			default:
-				err := onRoomMessage(cancelCtx, conn, room)
+				err := onRoomMessage(cancelCtx, socket, room)
 				if err != nil {
 					writeCode = "write_message_close"
-					writeWebsocketError(conn, err)
+					socket.writeWebsocketError(err)
 					joinLog.WithField("connection", connection.Address.ID).Info(err)
 					return
 				}
@@ -205,10 +231,10 @@ func (s *WebSocket) serveRoom(opt *roomApi.Info, connection *roomApi.Connection,
 			retCode = "room_close"
 			return
 		default:
-			err := readClientMessage(cancelCtx, conn, room)
+			err := readClientMessage(cancelCtx, socket, room)
 			if err != nil {
 				retCode = "read_message_close"
-				writeWebsocketError(conn, err)
+				socket.writeWebsocketError(err)
 				joinLog.WithField("connection", connection.Address.ID).Info(err)
 				return
 			}
@@ -303,8 +329,9 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 	name := r.URL.Query().Get("name")
 	userId := r.URL.Query().Get("userId")
 	address, err := eventApi.NewAddressFromID(id)
+	socket := &socket{conn: conn}
 	if err != nil {
-		writeWebsocketError(conn, roomApi.NewRoomNotFoundError(err.Error()))
+		socket.writeWebsocketError(roomApi.NewRoomNotFoundError(err.Error()))
 		return
 	}
 
@@ -319,13 +346,13 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 
 	room, err := s.roomManager.JoinRoom(r.Context(), connection, opt)
 	if err != nil {
-		writeWebsocketError(conn, fmt.Errorf("加入房间错误%w", err))
+		socket.writeWebsocketError(fmt.Errorf("加入房间错误%w", err))
 		return
 	}
 
 	users, err := s.roomManager.GetRoomUsers(r.Context(), opt)
 	if err != nil {
-		writeWebsocketError(conn, fmt.Errorf("获取房间用户列表%w", err))
+		socket.writeWebsocketError(fmt.Errorf("获取房间用户列表%w", err))
 		return
 	}
 
@@ -335,10 +362,10 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 		joinLog.WithError(err).Error("send connect message marshal error")
 	}
 
-	err = conn.WriteMessage(websocket.TextMessage, bs)
+	err = socket.WriteMessage(websocket.TextMessage, bs)
 	if err != nil {
 		joinLog.WithError(err).Error("send connect message error")
 	}
 
-	s.serveRoom(opt, connection, conn, room)
+	s.serveRoom(opt, connection, socket, room)
 }

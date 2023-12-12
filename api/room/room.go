@@ -25,8 +25,9 @@ const (
 )
 
 type RawMessage struct {
-	Type    string          `json:"type"`
-	Content json.RawMessage `json:"content"`
+	Type      string          `json:"type"`
+	RequestId string          `json:"requestId"`
+	Content   json.RawMessage `json:"content"`
 }
 
 func (rm *RawMessage) ToMessage() (*Message, error) {
@@ -37,14 +38,16 @@ func (rm *RawMessage) ToMessage() (*Message, error) {
 	}
 
 	return &Message{
-		Type:    rm.Type,
-		Content: content,
+		Type:      rm.Type,
+		RequestId: rm.RequestId,
+		Content:   content,
 	}, nil
 }
 
 type Message struct {
-	Type    string      `json:"type"`
-	Content interface{} `json:"content"`
+	Type      string      `json:"type"`
+	RequestId string      `json:"requestId"`
+	Content   interface{} `json:"content"`
 }
 
 func (m *Message) ToString() string {

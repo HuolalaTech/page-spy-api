@@ -2,6 +2,8 @@ package room
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 	"sort"
 	"time"
 
@@ -108,6 +110,10 @@ func (r *RemoteRpcRoomManager) GetRoomUsers(ctx context.Context, info *room.Info
 	room, err := r.GetRoom(ctx, info)
 	if err != nil {
 		return nil, err
+	}
+
+	if room == nil || reflect.ValueOf(room).IsNil() {
+		return nil, fmt.Errorf("房间 %s 不存在呢", info.Address.ID)
 	}
 
 	return room.GetRoomUsers(), nil

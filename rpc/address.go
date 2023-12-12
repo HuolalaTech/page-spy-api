@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"sort"
 	"strconv"
 	"time"
 
@@ -44,6 +45,16 @@ func getAvailablePortWithLimit() (string, error) {
 	return getAvailablePort(5)
 }
 
+func GetSelfAddress(info []*config.Address) *config.Address {
+	for _, address := range info {
+		if address.Ip == util.GetLocalIP() {
+			return address
+		}
+	}
+
+	return nil
+}
+
 func NewAddressManager(c *config.Config) (*AddressManager, error) {
 	port, err := getAvailablePortWithLimit()
 	if err != nil {
@@ -51,34 +62,62 @@ func NewAddressManager(c *config.Config) (*AddressManager, error) {
 	}
 
 	localManager := &AddressManager{
-		machineInfo: &config.MachineInfo{
-			MachineAddress: map[string]*config.Address{
-				LOCAL_NAME: {
-					Ip:   "127.0.0.1",
-					Port: port,
-				},
+		selfMachineId: LOCAL_NAME,
+		machineInfo: map[string]*config.Address{
+			LOCAL_NAME: {
+				Ip:   "127.0.0.1",
+				Port: port,
 			},
 		},
 	}
 
-	if c.MachineInfo == nil || len(c.MachineInfo.MachineAddress) <= 0 {
+	if c.RpcAddress == nil || len(c.RpcAddress) <= 0 {
 		return localManager, nil
 	}
 
+	selfAddress := GetSelfAddress(c.RpcAddress)
+	if selfAddress == nil {
+		return nil, fmt.Errorf("多实例部署，获取本机地址错误，配置列表没有ip: %s信息", util.GetLocalIP())
+	}
+
+	selfId := ""
+
+	rm := map[string]*config.Address{}
+	a := []string{}
+	for _, info := range c.RpcAddress {
+		key := fmt.Sprintf("%s:%s", info.Ip, info.Port)
+		rm[key] = info
+		a = append(a, key)
+	}
+
+	sort.Strings(a)
+	nAddress := map[string]*config.Address{}
+	for i, key := range a {
+		newKey := fmt.Sprintf("A%d", i)
+		address := rm[key]
+		nAddress[newKey] = address
+		log.Infof("生成机器编号 %s => %s:%s", newKey, address.Ip, address.Port)
+		if address.Ip == selfAddress.Ip && address.Port == selfAddress.Port {
+			selfId = newKey
+		}
+	}
+
+	if selfId == "" {
+		return nil, fmt.Errorf("多实例部署生成本地编号错误")
+	}
+
+	log.Infof("当前机器编号 %s", selfId)
 	m := &AddressManager{
-		machineInfo: c.MachineInfo,
-	}
-
-	// 如果没有注册机器则开启本地模式
-	if m.GetSelfMachineID() == LOCAL_NAME {
-		return localManager, nil
+		selfMachineId: selfId,
+		machineInfo:   nAddress,
 	}
 
 	return m, nil
 }
 
 type AddressManager struct {
-	machineInfo *config.MachineInfo
+	selfMachineId string
+	machineInfo   map[string]*config.Address
 }
 
 func (a *AddressManager) GeneratorConnectionAddress() *event.Address {
@@ -106,13 +145,7 @@ func (a *AddressManager) GeneratorLocalID() string {
 }
 
 func (a *AddressManager) GetSelfMachineID() string {
-	for id, info := range a.machineInfo.MachineAddress {
-		if info.Ip == util.GetLocalIP() {
-			return id
-		}
-	}
-
-	return LOCAL_NAME
+	return a.selfMachineId
 }
 
 func (a *AddressManager) IsSelfMachineAddress(address *event.Address) bool {
@@ -124,5 +157,5 @@ func (a *AddressManager) GetSelfAddress() *config.Address {
 }
 
 func (a *AddressManager) GetMachineIpInfo() map[string]*config.Address {
-	return a.machineInfo.MachineAddress
+	return a.machineInfo
 }

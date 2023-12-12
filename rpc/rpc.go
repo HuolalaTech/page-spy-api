@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/HuolalaTech/page-spy-api/api/event"
@@ -64,5 +63,6 @@ func (r *RpcManager) Run() {
 		if err != nil {
 			log.Fatal(err)
 		}
+		log.Infof("启动本地rpc服务端口:%s", r.addressManager.GetSelfAddress().Port)
 	}()
 }

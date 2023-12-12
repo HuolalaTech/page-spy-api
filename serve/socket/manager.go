@@ -6,6 +6,7 @@ import (
 	"github.com/HuolalaTech/page-spy-api/logger"
 	"github.com/HuolalaTech/page-spy-api/room"
 	"github.com/HuolalaTech/page-spy-api/rpc"
+	"github.com/HuolalaTech/page-spy-api/util"
 )
 
 func NewManager(config *config.Config) (*room.RemoteRpcRoomManager, error) {
@@ -31,6 +32,7 @@ func NewManager(config *config.Config) (*room.RemoteRpcRoomManager, error) {
 
 	manager := room.NewRemoteRpcRoomManager(addressManager, rpcManager, localEvent, localRoomManager)
 	manager.Start()
-	logger.Log().Infof("init join serve %s ok", addressManager.GetSelfMachineID())
+	logger.Log().Infof("启动 rpc serve %s ok", addressManager.GetSelfMachineID())
+	logger.Log().Infof("local ip %s:%s", util.GetLocalIP(), config.Port)
 	return manager, nil
 }

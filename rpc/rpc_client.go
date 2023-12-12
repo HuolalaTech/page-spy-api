@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/rpc"
+	"reflect"
 	"sync"
 	"time"
 
 	"github.com/HuolalaTech/page-spy-api/api/room"
 	"github.com/HuolalaTech/page-spy-api/state"
-	req "github.com/imroc/req/v3"
+	req "github.com/imroc/req/v2"
 )
 
 type RpcClient struct {
@@ -76,7 +77,7 @@ type Result struct {
 	Id     int64       `json:"id"`
 }
 
-func (r *RpcClient) Call(ctx context.Context, serviceMethod string, args interface{}, reply interface{}) error {
+func (r *RpcClient) call(ctx context.Context, serviceMethod string, args interface{}, reply interface{}) error {
 	id := r.getId()
 	body := map[string]interface{}{
 		"method": serviceMethod,
@@ -105,10 +106,18 @@ func (r *RpcClient) Call(ctx context.Context, serviceMethod string, args interfa
 		return fmt.Errorf(result.Error)
 	}
 
+	bs, _ := json.Marshal(result)
+	log.Debugf("rpc call %s method %s response %s", r.address, serviceMethod, string(bs))
 	basicRes, ok := reply.(room.BasicRpcResponseInterface)
-	if ok && basicRes.GetError() != nil {
+	if ok && !reflect.ValueOf(basicRes).IsNil() && basicRes.GetError() != nil {
 		return basicRes.GetError()
 	}
 
 	return nil
+}
+
+func (r *RpcClient) Call(ctx context.Context, serviceMethod string, args interface{}, reply interface{}) error {
+	err := r.call(ctx, serviceMethod, args, reply)
+	log.Debugf("rpc call %s method %s", r.address, serviceMethod)
+	return err
 }

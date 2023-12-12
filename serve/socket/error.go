@@ -16,16 +16,21 @@ func Unwrap(err error) error {
 
 func NewErrorMessage(err error) *room.Message {
 	te := Unwrap(err)
+
 	re, ok := te.(*room.Error)
+	if re == nil {
+		return nil
+	}
+
 	if ok {
 		return &room.Message{
 			Type:    room.ErrorType,
-			Content: &room.ErrorMessageContent{Message: err.Error(), Code: string(re.Code)},
+			Content: &room.ErrorMessageContent{Message: re.Error(), Code: string(re.Code)},
 		}
 	}
 
 	return &room.Message{
 		Type:    room.ErrorType,
-		Content: &room.ErrorMessageContent{Message: err.Error(), Code: room.UnknownError},
+		Content: &room.ErrorMessageContent{Message: re.Error(), Code: room.UnknownError},
 	}
 }

@@ -73,7 +73,7 @@ func (r *localRoom) Start(ctx context.Context) error {
 				} else {
 					err := r.SendMessage(context.Background(), msg)
 					if err != nil {
-						r.log.WithError(err).Errorf("广播消息%s错误", msg.ToString())
+						r.log.WithError(err).Errorf("本地房间广播消息房间错误%s", err.Error())
 					}
 				}
 			case <-r.Done():
@@ -171,7 +171,7 @@ func (r *localRoom) broadcastMessage(ctx context.Context, msg *room.Message) err
 	for _, c := range connections {
 		e := r.event.Emit(ctx, c.Address, eventMsg)
 		if e != nil {
-			r.log.WithError(e).Errorf("Emit connection 消息错误 %s %s", c.Address.ID, eventMsg.Content)
+			r.log.WithError(e).Errorf("Emit connection 消息错误 %s %s", c.Address.ID, e.Error())
 			err = e
 		}
 	}

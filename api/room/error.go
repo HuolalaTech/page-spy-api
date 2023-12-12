@@ -2,20 +2,20 @@ package room
 
 import "fmt"
 
-type Error struct {
-	Code    ErrorCode
-	Message string
-}
 type BasicRpcResponseInterface interface {
-	GetError() *Error
+	GetError() error
 }
 
 type BasicRpcResponse struct {
-	Error *Error
+	Error *Error `json:"error"`
 }
 
-func (b *BasicRpcResponse) GetError() *Error {
-	return b.Error
+func (b *BasicRpcResponse) GetError() error {
+	if b.Error == nil {
+		return nil
+	}
+
+	return fmt.Errorf("Code: %s Message:%s", b.Error.Code, b.Error.Message)
 }
 
 func (b *BasicRpcResponse) SetError(err error) error {
@@ -43,8 +43,13 @@ const (
 	ServeError          = "ServeError"
 )
 
-func (e Error) Error() string {
-	return e.Message
+type Error struct {
+	Code    ErrorCode
+	Message string
+}
+
+func (e *Error) Error() string {
+	return fmt.Sprintf("Code: %s Message: %s", e.Code, e.Message)
 }
 
 func NewError(msg string) *Error {

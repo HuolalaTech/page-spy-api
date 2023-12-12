@@ -17,7 +17,6 @@ func NewLocalRpcRoomManager(localRoomManager *LocalRoomManager, rpcManager *rpc.
 	manager := &LocalRpcRoomManager{
 		localRoomManager: localRoomManager,
 	}
-
 	return manager, rpcManager.Regist("LocalRpcRoomManager", manager)
 }
 
