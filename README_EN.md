@@ -10,7 +10,8 @@
 
 <h1>Page Spy API</h1>
 
-The repo is the backend service for [HuolalaTech/page-spy-web][main-repo], which includes static resource serving, HTTP service, and WebSocket service.
+<p>PageSpy is a developer platform for debugging web page.</p>
+
 
 [![API Version][api-ver-img]][api-ver-url]
 [![Go Version][api-go-img]][api-go-url]
@@ -18,7 +19,11 @@ The repo is the backend service for [HuolalaTech/page-spy-web][main-repo], which
 English | [中文](./README.md)
 </div>
 
-# How to use
+## What's this
+
+The repo is the backend service for [HuolalaTech/page-spy-web][main-repo], which includes static resource serving, HTTP service, and WebSocket service.
+
+## How to use
 
 ```golang
 package main

@@ -4,21 +4,24 @@
 [api-go-img]: https://img.shields.io/github/go-mod/go-version/HuolalaTech/page-spy-api?label=go
 [api-go-url]: https://github.com/HuolalaTech/page-spy-api/blob/master/go.mod
 
-
 <div align="center">
 <img src="./.github/assets/logo.svg" height="100" />
 
 <h1>Page Spy API</h1>
-
-该仓库是 [HuolalaTech/page-spy-web][main-repo] 的后端服务，其中包括静态资源服务，http 服务以及 websocket 服务。
+<p>PageSpy 是一款远程调试网页的工具。</p>
 
 [![API Version][api-ver-img]][api-ver-url]
 [![Go Version][api-go-img]][api-go-url]
 
 [English](./README_EN.md) | 中文
+
 </div>
 
-# 如何使用
+## 简介
+
+该仓库是 [HuolalaTech/page-spy-web][main-repo] 的后端服务，其中包括静态资源服务，http 服务以及 websocket 服务。
+
+## 如何使用
 
 ```golang
 package main
@@ -56,11 +59,11 @@ func main() {
 
 ## 目录结构
 
-- config 		项目配置
-- container 	依赖注入
-- event 		事件结构定义
-- logger 		日志接口
-- metric 		打点接口
-- room 		房间接口
-- rpc			多机器 rpc 接口
-- serve		http websocket 服务
+- config 项目配置
+- container 依赖注入
+- event 事件结构定义
+- logger 日志接口
+- metric 打点接口
+- room 房间接口
+- rpc 多机器 rpc 接口
+- serve http websocket 服务
