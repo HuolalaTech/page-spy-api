@@ -34,8 +34,13 @@ type RemoteRpcRoomManager struct {
 	localRoomManager *LocalRoomManager
 }
 
-func (r *RemoteRpcRoomManager) getRpcByAddress(address *event.Address) *localRpc.RpcClient {
-	return r.rpcManager.GetRpcByAddress(address)
+func (r *RemoteRpcRoomManager) getRpcByAddress(address *event.Address) (*localRpc.RpcClient, error) {
+	rpc := r.rpcManager.GetRpcByAddress(address)
+	if rpc == nil {
+		return nil, fmt.Errorf("rpc client %s 不存在", address.MachineID)
+	}
+
+	return rpc, nil
 }
 
 func (r *RemoteRpcRoomManager) Start() {
@@ -123,7 +128,11 @@ func (r *RemoteRpcRoomManager) GetRoom(ctx context.Context, info *room.Info) (ro
 	req := NewRpcLocalRoomManagerRequest()
 	req.Info = info
 	res := NewRpcLocalRoomManagerResponse()
-	err := r.getRpcByAddress(info.Address).Call(ctx, "LocalRpcRoomManager.GetRoom", req, res)
+	rpcClient, err := r.getRpcByAddress(info.Address)
+	if err != nil {
+		return nil, err
+	}
+	err = rpcClient.Call(ctx, "LocalRpcRoomManager.GetRoom", req, res)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +143,12 @@ func (r *RemoteRpcRoomManager) RemoveRoom(ctx context.Context, info *room.Info) 
 	req := NewRpcLocalRoomManagerRequest()
 	req.Info = info
 	res := NewRpcLocalRoomManagerResponse()
-	return r.getRpcByAddress(info.Address).Call(ctx, "LocalRpcRoomManager.RemoveRoom", req, res)
+	rpcClient, err := r.getRpcByAddress(info.Address)
+	if err != nil {
+		return err
+	}
+
+	return rpcClient.Call(ctx, "LocalRpcRoomManager.RemoveRoom", req, res)
 }
 
 func (r *RemoteRpcRoomManager) getRemoteRoom(info *room.Info) (room.RemoteRoom, bool) {
@@ -159,7 +173,12 @@ func (r *RemoteRpcRoomManager) LeaveRoom(ctx context.Context, info *room.Info, c
 	req.Info = info
 	req.Connection = connection
 	res := NewRpcLocalRoomManagerResponse()
-	return r.getRpcByAddress(info.Address).Call(ctx, "LocalRpcRoomManager.LeaveRoom", req, res)
+	rpcClient, err := r.getRpcByAddress(info.Address)
+	if err != nil {
+		return err
+	}
+
+	return rpcClient.Call(ctx, "LocalRpcRoomManager.LeaveRoom", req, res)
 }
 
 func (r *RemoteRpcRoomManager) CreateAndJoinRoom(ctx context.Context, connection *room.Connection, opt *room.Info) (room.RemoteRoom, error) {
@@ -216,7 +235,12 @@ func (r *RemoteRpcRoomManager) joinRoom(ctx context.Context, connection *room.Co
 	req.Info = info
 	req.Connection = connection
 	res := NewRpcLocalRoomManagerResponse()
-	err := r.getRpcByAddress(info.Address).Call(ctx, "LocalRpcRoomManager.JoinRoom", req, res)
+	rpcClient, err := r.getRpcByAddress(info.Address)
+	if err != nil {
+		return err
+	}
+
+	err = rpcClient.Call(ctx, "LocalRpcRoomManager.JoinRoom", req, res)
 	if err != nil {
 		return err
 	}
