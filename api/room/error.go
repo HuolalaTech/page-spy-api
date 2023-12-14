@@ -15,7 +15,7 @@ func (b *BasicRpcResponse) GetError() error {
 		return nil
 	}
 
-	return fmt.Errorf("Code: %s Message:%s", b.Error.Code, b.Error.Message)
+	return b.Error
 }
 
 func (b *BasicRpcResponse) SetError(err error) error {
