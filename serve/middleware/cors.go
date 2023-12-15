@@ -19,7 +19,7 @@ func CORS(c *config.Config) echo.MiddlewareFunc {
 		AllowCredentials: true,
 		MaxAge:           12 * 60 * 60,
 		AllowOriginFunc: func(origin string) (bool, error) {
-			if c.CrosConfig == nil {
+			if c.CorsConfig == nil {
 				return true, nil
 			}
 
@@ -27,21 +27,21 @@ func CORS(c *config.Config) echo.MiddlewareFunc {
 		},
 	}
 
-	if c.CrosConfig != nil {
-		if !isEmptyArray(c.CrosConfig.AllowOrigins) {
-			config.AllowOrigins = c.CrosConfig.AllowOrigins
+	if c.CorsConfig != nil {
+		if !isEmptyArray(c.CorsConfig.AllowOrigins) {
+			config.AllowOrigins = c.CorsConfig.AllowOrigins
 		}
 
-		if !isEmptyArray(c.CrosConfig.AllowMethods) {
-			config.AllowOrigins = c.CrosConfig.AllowMethods
+		if !isEmptyArray(c.CorsConfig.AllowMethods) {
+			config.AllowOrigins = c.CorsConfig.AllowMethods
 		}
 
-		if !isEmptyArray(c.CrosConfig.AllowHeaders) {
-			config.AllowOrigins = c.CrosConfig.AllowHeaders
+		if !isEmptyArray(c.CorsConfig.AllowHeaders) {
+			config.AllowOrigins = c.CorsConfig.AllowHeaders
 		}
 
-		if !isEmptyArray(c.CrosConfig.ExposeHeaders) {
-			config.AllowOrigins = c.CrosConfig.ExposeHeaders
+		if !isEmptyArray(c.CorsConfig.ExposeHeaders) {
+			config.AllowOrigins = c.CorsConfig.ExposeHeaders
 		}
 	}
 

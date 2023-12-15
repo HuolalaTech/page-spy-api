@@ -4,7 +4,7 @@ import (
 	"io/fs"
 )
 
-type CrosConfig struct {
+type CorsConfig struct {
 	AllowOrigins  []string `json:"allowOrigins"`
 	AllowMethods  []string `json:"allowMethods"`
 	AllowHeaders  []string `json:"allowHeaders"`
@@ -14,7 +14,7 @@ type CrosConfig struct {
 type Config struct {
 	Port       string      `json:"port"`
 	RpcAddress []*Address  `json:"rpcAddress"`
-	CrosConfig *CrosConfig `json:"crosConfig"`
+	CorsConfig *CorsConfig `json:"corsConfig"`
 }
 
 type Address struct {
