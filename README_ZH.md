@@ -4,26 +4,24 @@
 [api-go-img]: https://img.shields.io/github/go-mod/go-version/HuolalaTech/page-spy-api?label=go
 [api-go-url]: https://github.com/HuolalaTech/page-spy-api/blob/master/go.mod
 
-
 <div align="center">
 <img src="./.github/assets/logo.svg" height="100" />
 
 <h1>Page Spy API</h1>
-
-<p>PageSpy is a developer platform for debugging web page.</p>
-
+<p>PageSpy 是一款远程调试网页的工具。</p>
 
 [![API Version][api-ver-img]][api-ver-url]
 [![Go Version][api-go-img]][api-go-url]
 
-English | [中文](./README.md)
+[English](./README.md) | 中文
+
 </div>
 
-## What's this
+## 简介
 
-The repo is the backend service for [HuolalaTech/page-spy-web][main-repo], which includes static resource serving, HTTP service, and WebSocket service.
+该仓库是 [HuolalaTech/page-spy-web][main-repo] 的后端服务，其中包括静态资源服务，http 服务以及 websocket 服务。
 
-## How to use
+## 如何使用
 
 ```golang
 package main
@@ -43,7 +41,7 @@ var publicContent embed.FS
 func main() {
 	container := container.Container()
 	err := container.Provide(func() *config.StaticConfig {
-		// page-spy-web build dist static proxy, if no need you can return nil
+		// page-spy-web 构建 dist 结构静态资源代理，如果只使用后端可以 return nil
 		return &config.StaticConfig{
 			DirName: "dist",
 			Files:   publicContent,
@@ -59,12 +57,13 @@ func main() {
 
 ```
 
-## Directory Structure
-- config: Project configuration.
-- container: Dependency injection.
-- event: Event structure definitions.
-- logger: Logging interface.
-- metric: Metrics interface.
-- room: Room interface.
-- rpc: Multi-machine RPC interface.
-- serve: HTTP and WebSocket services.
+## 目录结构
+
+- config 项目配置
+- container 依赖注入
+- event 事件结构定义
+- logger 日志接口
+- metric 打点接口
+- room 房间接口
+- rpc 多机器 rpc 接口
+- serve http websocket 服务
