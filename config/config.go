@@ -15,6 +15,8 @@ type Config struct {
 	Port       string      `json:"port"`
 	RpcAddress []*Address  `json:"rpcAddress"`
 	CorsConfig *CorsConfig `json:"corsConfig"`
+	PublicPath string      `json:"publicPath"`
+	BaseAPIURL string      `json:"baseAPIURL"`
 }
 
 type Address struct {
