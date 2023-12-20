@@ -25,7 +25,7 @@ func packageToRoomMessage(pkg *event.Package) (*room.Message, error) {
 	content := room.NewMessageContent(pkg.RoutingKey)
 	err := json.Unmarshal(pkg.Content, content)
 	if err != nil {
-		return nil, fmt.Errorf("Raw message to message error %w", err)
+		return nil, fmt.Errorf("raw message to message error %w", err)
 	}
 
 	return &room.Message{
