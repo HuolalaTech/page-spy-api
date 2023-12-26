@@ -95,8 +95,6 @@ func (s *socket) WriteJSON(v interface{}) error {
 }
 
 func (s *socket) ReadJSON(v interface{}) error {
-	s.rwLock.RLock()
-	defer s.rwLock.RUnlock()
 	return s.conn.ReadJSON(v)
 }
 
