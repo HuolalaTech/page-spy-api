@@ -18,6 +18,7 @@ const (
 	StartType   = "start"
 	CloseType   = "close"
 	PingType    = "ping"
+	ReplyType   = "reply"
 	JoinType    = "join"
 	ErrorType   = "error"
 	LeaveType   = "leave"
@@ -48,6 +49,14 @@ type Message struct {
 	Type      string      `json:"type"`
 	RequestId string      `json:"requestId"`
 	Content   interface{} `json:"content"`
+}
+
+func (m *Message) GetReply() *Message {
+	return &Message{
+		Type:      ReplyType,
+		RequestId: m.RequestId,
+		Content:   map[string]string{},
+	}
 }
 
 func (m *Message) ToString() string {
