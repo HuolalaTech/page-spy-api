@@ -1,6 +1,7 @@
 package container
 
 import (
+	"io/fs"
 	"log"
 	"net/http"
 
@@ -9,8 +10,6 @@ import (
 	"github.com/HuolalaTech/page-spy-api/serve/socket"
 	"github.com/HuolalaTech/page-spy-api/static"
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
-
 	"go.uber.org/dig"
 )
 
@@ -51,11 +50,15 @@ func initContainer() (*dig.Container, error) {
 			return nil
 		})
 
+		dist, err := fs.Sub(staticConfig.Files, "dist")
+		if err != nil {
+			// it will never be here
+			panic(err)
+		}
+
 		ff := static.NewFallbackFS(
-			staticConfig.Files,
-			staticConfig.DirName+"/index.html",
-			config.PublicPath,
-			config.BaseAPIURL,
+			dist,
+			"index.html",
 		)
 
 		if staticConfig != nil {
@@ -63,7 +66,6 @@ func initContainer() (*dig.Container, error) {
 				"/*",
 				echo.WrapHandler(
 					http.FileServer(http.FS(ff))),
-				middleware.Rewrite(map[string]string{"/*": "/dist/$1"}),
 				selfMiddleware.Cache(),
 			)
 		}
