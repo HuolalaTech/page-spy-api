@@ -160,7 +160,7 @@ func (r *localRoom) pingMessage(ctx context.Context) error {
 	return nil
 }
 
-func (r *localRoom) broadcastMessage(ctx context.Context, msg *room.Message) error {
+func (r *localRoom) otherMessage(ctx context.Context, msg *room.Message) error {
 	connections := r.getConnectionsWithLock()
 	eventMsg, err := roomMessageToPackage(msg, r.Info.Address)
 	if err != nil {
@@ -179,8 +179,64 @@ func (r *localRoom) broadcastMessage(ctx context.Context, msg *room.Message) err
 	return err
 }
 
+func (r *localRoom) broadcastMessage(ctx context.Context, msg *room.Message) error {
+	content, ok := msg.Content.(*room.BroadcastMessageContent)
+	if !ok {
+		return fmt.Errorf("message 消息内容格式错误")
+	}
+
+	connections := r.getConnectionsWithLock()
+	eventMsg, err := roomMessageToPackage(msg, r.Info.Address)
+	if err != nil {
+		return err
+	}
+
+	r.Info.ActiveAt = time.Now()
+	for _, c := range connections {
+		if !(c.Address.Equal(content.From.Address) && !content.IncludeSelf) {
+			e := r.event.Emit(ctx, c.Address, eventMsg)
+			if e != nil {
+				r.log.WithError(e).Errorf("Emit connection 消息错误 %s %s", c.Address.ID, e.Error())
+				err = e
+			}
+		}
+	}
+
+	return err
+}
+
+func (r *localRoom) messageMessage(ctx context.Context, msg *room.Message) error {
+	content, ok := msg.Content.(*room.MessageMessageContent)
+	if !ok {
+		return fmt.Errorf("message 消息内容格式错误")
+	}
+
+	if content.To == nil {
+		return fmt.Errorf("单播消息 to 字段为空")
+	}
+
+	connections := r.getConnectionsWithLock()
+	eventMsg, err := roomMessageToPackage(msg, r.Info.Address)
+	if err != nil {
+		return err
+	}
+
+	r.Info.ActiveAt = time.Now()
+	for _, c := range connections {
+		if c.Address.Equal(content.To.Address) {
+			e := r.event.Emit(ctx, c.Address, eventMsg)
+			if e != nil {
+				r.log.WithError(e).Errorf("Emit connection 消息错误 %s %s", c.Address.ID, e.Error())
+				err = e
+			}
+		}
+	}
+
+	return err
+}
+
 func (r *localRoom) SendMessage(ctx context.Context, msg *room.Message) error {
-	if room.IsMessageType(msg.Type) {
+	if room.NotMessageType(msg.Type) {
 		return fmt.Errorf("消息类型 %s 为错误消息类型", msg.Type)
 	}
 
@@ -189,7 +245,20 @@ func (r *localRoom) SendMessage(ctx context.Context, msg *room.Message) error {
 		return r.pingMessage(ctx)
 	}
 
-	return r.broadcastMessage(ctx, msg)
+	switch msg.Type {
+	case room.MessageType:
+		return r.messageMessage(ctx, msg)
+	case room.BroadcastType:
+		return r.broadcastMessage(ctx, msg)
+	case room.PingType:
+		return r.pingMessage(ctx)
+	}
+
+	if !room.NotMessageType(msg.Type) {
+		return r.otherMessage(ctx, msg)
+	}
+
+	return fmt.Errorf("发送消息类型 %s 不支持用户发送", msg.Type)
 }
 
 func (r *localRoom) SendMessageWithTimeout(msg *room.Message, timeout time.Duration) {

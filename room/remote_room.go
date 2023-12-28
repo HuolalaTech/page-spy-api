@@ -104,7 +104,7 @@ func (r *remoteRoom) broadcast(ctx context.Context, msg *room.Message) error {
 }
 
 func (r *remoteRoom) SendMessage(ctx context.Context, msg *room.Message) error {
-	if room.IsMessageType(msg.Type) {
+	if room.NotMessageType(msg.Type) {
 		return fmt.Errorf("消息类型 %s 为错误消息类型", msg.Type)
 	}
 
