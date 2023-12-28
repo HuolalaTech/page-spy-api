@@ -27,7 +27,7 @@ const (
 
 type RawMessage struct {
 	Type      string          `json:"type"`
-	CreatedAt time.Time       `json:"createdAt"`
+	CreatedAt int64           `json:"createdAt"`
 	RequestId string          `json:"requestId"`
 	Content   json.RawMessage `json:"content"`
 }
@@ -49,7 +49,7 @@ func (rm *RawMessage) ToMessage() (*Message, error) {
 
 type Message struct {
 	Type      string      `json:"type"`
-	CreatedAt time.Time   `json:"createdAt"`
+	CreatedAt int64       `json:"createdAt"`
 	RequestId string      `json:"requestId"`
 	Content   interface{} `json:"content"`
 }
@@ -57,7 +57,7 @@ type Message struct {
 func (m *Message) GetPong() *Message {
 	return &Message{
 		Type:      PongType,
-		CreatedAt: time.Now(),
+		CreatedAt: time.Now().UnixNano() / int64(time.Millisecond),
 		RequestId: m.RequestId,
 		Content:   map[string]string{},
 	}
