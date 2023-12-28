@@ -50,18 +50,18 @@ func initContainer() (*dig.Container, error) {
 			return nil
 		})
 
-		dist, err := fs.Sub(staticConfig.Files, "dist")
-		if err != nil {
-			// it will never be here
-			panic(err)
-		}
-
-		ff := static.NewFallbackFS(
-			dist,
-			"index.html",
-		)
-
 		if staticConfig != nil {
+			dist, err := fs.Sub(staticConfig.Files, "dist")
+			if err != nil {
+				// it will never be here
+				panic(err)
+			}
+
+			ff := static.NewFallbackFS(
+				dist,
+				"index.html",
+			)
+
 			e.GET(
 				"/*",
 				echo.WrapHandler(
