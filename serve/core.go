@@ -9,8 +9,8 @@ import (
 
 func Run() {
 	err := container.Container().Invoke(func(e *echo.Echo, config *config.Config) {
-		log.Infof("远程访问地址 http://%s:%s/room-list", util.GetLocalIP(), config.Port)
-		log.Infof("本地访问地址 http://localhost:%s/room-list", config.Port)
+		log.Infof("远程访问地址 http://%s:%s", util.GetLocalIP(), config.Port)
+		log.Infof("本地访问地址 http://localhost:%s", config.Port)
 		e.Logger.Fatal(e.Start(":" + config.Port))
 	})
 
