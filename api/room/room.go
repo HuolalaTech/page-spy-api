@@ -18,7 +18,7 @@ const (
 	StartType   = "start"
 	CloseType   = "close"
 	PingType    = "ping"
-	ReplyType   = "reply"
+	PongType    = "pong"
 	JoinType    = "join"
 	ErrorType   = "error"
 	LeaveType   = "leave"
@@ -27,6 +27,7 @@ const (
 
 type RawMessage struct {
 	Type      string          `json:"type"`
+	CreatedAt time.Time       `json:"createdAt"`
 	RequestId string          `json:"requestId"`
 	Content   json.RawMessage `json:"content"`
 }
@@ -40,6 +41,7 @@ func (rm *RawMessage) ToMessage() (*Message, error) {
 
 	return &Message{
 		Type:      rm.Type,
+		CreatedAt: rm.CreatedAt,
 		RequestId: rm.RequestId,
 		Content:   content,
 	}, nil
@@ -47,13 +49,15 @@ func (rm *RawMessage) ToMessage() (*Message, error) {
 
 type Message struct {
 	Type      string      `json:"type"`
+	CreatedAt time.Time   `json:"createdAt"`
 	RequestId string      `json:"requestId"`
 	Content   interface{} `json:"content"`
 }
 
-func (m *Message) GetReply() *Message {
+func (m *Message) GetPong() *Message {
 	return &Message{
-		Type:      ReplyType,
+		Type:      PongType,
+		CreatedAt: time.Now(),
 		RequestId: m.RequestId,
 		Content:   map[string]string{},
 	}
@@ -77,7 +81,7 @@ func IsPublicMessageType(messageType string) bool {
 	return false
 }
 
-func IsMessageType(messageType string) bool {
+func NotMessageType(messageType string) bool {
 	switch messageType {
 	case BroadcastType, MessageType:
 		return false
@@ -92,6 +96,7 @@ func IsMessageType(messageType string) bool {
 	case UnknownType:
 		return true
 	}
+
 	return true
 }
 
@@ -189,8 +194,9 @@ type MessageMessageContent struct {
 }
 
 type BroadcastMessageContent struct {
-	Data interface{} `json:"data"`
-	From *Connection `json:"from"`
+	Data        interface{} `json:"data"`
+	From        *Connection `json:"from"`
+	IncludeSelf bool        `json:"includeSelf"`
 }
 
 func NewBroadcastMessage(data interface{}, from *Connection) *Message {

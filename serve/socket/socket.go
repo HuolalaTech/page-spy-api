@@ -150,7 +150,10 @@ func readClientMessage(ctx context.Context, socket *socket, room roomApi.RemoteR
 		return nil
 	}
 
-	socket.WriteDataIgnoreError(msg.GetReply())
+	if msg.Type == roomApi.PingType {
+		socket.WriteDataIgnoreError(msg.GetPong())
+	}
+
 	return nil
 }
 
