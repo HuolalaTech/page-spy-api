@@ -25,4 +25,6 @@ type Address struct {
 type StaticConfig struct {
 	DirName string
 	Files   fs.FS
+	GitHash string
+	Version string
 }

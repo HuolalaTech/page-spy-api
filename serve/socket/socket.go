@@ -51,12 +51,12 @@ func writeResponse(w http.ResponseWriter, res *Response) {
 	}
 	bs, err := json.Marshal(res)
 	if err != nil {
-		joinLog.WithError(err).Error("write  message error")
+		joinLog.WithError(err).Error("write message error")
 	}
 
 	_, err = w.Write(bs)
 	if err != nil {
-		joinLog.WithError(err).Error("write  message error")
+		joinLog.WithError(err).Error("write message error")
 	}
 }
 
@@ -129,21 +129,21 @@ func readClientMessage(ctx context.Context, socket *socket, room roomApi.RemoteR
 			return roomApi.NewRoomCloseError("read message websocket error %s", err.Error())
 		}
 
-		socket.writeWebsocketError(roomApi.NewRoomCloseError("读取消息解析错误 %s", err.Error()))
+		socket.writeWebsocketError(roomApi.NewRoomCloseError("read and parse message failed, %s", err))
 		return nil
 	}
 	msg, err := rawMsg.ToMessage()
 
 	if err != nil {
-		socket.writeWebsocketError(roomApi.NewRoomCloseError("消息转换格式错误%s", err.Error()))
+		socket.writeWebsocketError(roomApi.NewRoomCloseError("message transform failed, %s", err))
 		return nil
 	}
 
 	if !roomApi.IsPublicMessageType(msg.Type) {
-		socket.writeWebsocketError(roomApi.NewRoomCloseError("前端不能发送消息类型 %s", msg.Type))
+		socket.writeWebsocketError(roomApi.NewRoomCloseError("message type %s is not supported to be sent by frontend", msg.Type))
 		return nil
 	}
-	log.Debugf("socket 接受信息 %s", msg.Type)
+	log.Debugf("socket received %s", msg.Type)
 	err = room.SendMessage(ctx, msg)
 	if err != nil {
 		socket.writeWebsocketError(err)
@@ -162,7 +162,7 @@ func onRoomMessage(ctx context.Context, socket *socket, room roomApi.RemoteRoom)
 	case msg := <-room.OnMessage():
 		socket.WriteDataIgnoreError(msg)
 	case <-room.Done():
-		return roomApi.NewRoomCloseError("room %s leave", room.GetRoomAddress().ID)
+		return roomApi.NewRoomCloseError("room %s left", room.GetRoomAddress().ID)
 	case <-ctx.Done():
 		socket.writeWebsocketError(roomApi.NewNetWorkTimeoutError("room %s context cancel", room.GetRoomAddress().ID))
 		return nil
@@ -305,7 +305,7 @@ func (s *WebSocket) CreateRoom(rw http.ResponseWriter, r *http.Request) {
 	group := r.URL.Query().Get("group")
 	tags := getTags(r.URL.Query())
 	if name == "" || group == "" {
-		writeResponse(rw, NewErrorResponse(errors.New("name 或者 group 参数缺失")))
+		writeResponse(rw, NewErrorResponse(errors.New("name or group missing")))
 		return
 	}
 
@@ -356,13 +356,13 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 
 	room, err := s.roomManager.JoinRoom(r.Context(), connection, opt)
 	if err != nil {
-		socket.writeWebsocketError(fmt.Errorf("加入房间错误%w", err))
+		socket.writeWebsocketError(fmt.Errorf("room join failed, %w", err))
 		return
 	}
 
 	users, err := s.roomManager.GetRoomUsers(r.Context(), opt)
 	if err != nil {
-		socket.writeWebsocketError(fmt.Errorf("获取房间用户列表%w", err))
+		socket.writeWebsocketError(fmt.Errorf("get room user list failed, %w", err))
 		return
 	}
 

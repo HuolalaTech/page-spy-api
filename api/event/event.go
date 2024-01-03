@@ -32,7 +32,7 @@ func (a *Address) Equal(compare *Address) bool {
 func NewAddressFromID(id string) (*Address, error) {
 	words := strings.Split(id, ".")
 	if len(words) != 2 {
-		return nil, fmt.Errorf("解析id %s 地址格式错误", id)
+		return nil, fmt.Errorf("%s is an invalid format", id)
 	}
 
 	return &Address{

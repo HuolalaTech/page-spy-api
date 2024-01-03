@@ -32,7 +32,7 @@ func NewManager(config *config.Config) (*room.RemoteRpcRoomManager, error) {
 
 	manager := room.NewRemoteRpcRoomManager(addressManager, rpcManager, localEvent, localRoomManager)
 	manager.Start()
-	logger.Log().Infof("启动 rpc serve %s ok", addressManager.GetSelfMachineID())
+	logger.Log().Infof("start rpc server %s successful", addressManager.GetSelfMachineID())
 	logger.Log().Infof("local ip %s:%s", util.GetLocalIP(), config.Port)
 	return manager, nil
 }

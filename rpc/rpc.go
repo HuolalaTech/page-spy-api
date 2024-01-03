@@ -52,7 +52,7 @@ func (r *RpcManager) listen() error {
 	route.Handle("/rpc", r.server)
 	err := http.ListenAndServe(":"+r.addressManager.GetSelfAddress().Port, route)
 	if err != nil {
-		return fmt.Errorf("监听端口错误 %w", err)
+		return fmt.Errorf("RPC Server start failed, %w", err)
 	}
 	return nil
 }
@@ -63,6 +63,6 @@ func (r *RpcManager) Run() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Infof("启动本地rpc服务端口:%s", r.addressManager.GetSelfAddress().Port)
+		log.Infof("RPC server started on :%s", r.addressManager.GetSelfAddress().Port)
 	}()
 }
