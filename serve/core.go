@@ -8,9 +8,18 @@ import (
 )
 
 func Run() {
-	err := container.Container().Invoke(func(e *echo.Echo, config *config.Config) {
-		log.Infof("远程访问地址 http://%s:%s", util.GetLocalIP(), config.Port)
-		log.Infof("本地访问地址 http://localhost:%s", config.Port)
+	err := container.Container().Invoke(func(e *echo.Echo, config *config.Config, staticConfig *config.StaticConfig) {
+		hash := staticConfig.GitHash
+		version := staticConfig.Version
+		if hash == "" {
+			hash = "local"
+		}
+		if version == "" {
+			version = "local"
+		}
+		log.Infof("server info: %s@%s", version, hash)
+		log.Infof("LAN address http://%s:%s", util.GetLocalIP(), config.Port)
+		log.Infof("Local address http://localhost:%s", config.Port)
 		e.Logger.Fatal(e.Start(":" + config.Port))
 	})
 

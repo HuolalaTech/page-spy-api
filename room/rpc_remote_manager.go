@@ -37,7 +37,7 @@ type RemoteRpcRoomManager struct {
 func (r *RemoteRpcRoomManager) getRpcByAddress(address *event.Address) (*localRpc.RpcClient, error) {
 	rpc := r.rpcManager.GetRpcByAddress(address)
 	if rpc == nil {
-		return nil, fmt.Errorf("rpc client %s 不存在", address.MachineID)
+		return nil, fmt.Errorf("rpc client %s not found", address.MachineID)
 	}
 
 	return rpc, nil
@@ -118,7 +118,7 @@ func (r *RemoteRpcRoomManager) GetRoomUsers(ctx context.Context, info *room.Info
 	}
 
 	if room == nil || reflect.ValueOf(room).IsNil() {
-		return nil, fmt.Errorf("房间 %s 不存在呢", info.Address.ID)
+		return nil, fmt.Errorf("room %s not found", info.Address.ID)
 	}
 
 	return room.GetRoomUsers(), nil

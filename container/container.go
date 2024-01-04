@@ -34,6 +34,8 @@ func initContainer() (*dig.Container, error) {
 		e := echo.New()
 		e.Use(selfMiddleware.Logger())
 		e.Use(selfMiddleware.CORS(config))
+		e.HidePort = true
+		e.HideBanner = true
 		route := e.Group("/api/v1")
 		route.GET("/room/list", func(c echo.Context) error {
 			socket.ListRooms(c.Response(), c.Request())

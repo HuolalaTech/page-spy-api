@@ -11,7 +11,7 @@ import (
 func roomMessageToPackage(msg *room.Message, from *event.Address) (*event.Package, error) {
 	bs, err := json.Marshal(msg.Content)
 	if err != nil {
-		return nil, fmt.Errorf("room message to message error %w", err)
+		return nil, fmt.Errorf("room message encode failed, %w", err)
 	}
 
 	return &event.Package{
@@ -25,7 +25,7 @@ func packageToRoomMessage(pkg *event.Package) (*room.Message, error) {
 	content := room.NewMessageContent(pkg.RoutingKey)
 	err := json.Unmarshal(pkg.Content, content)
 	if err != nil {
-		return nil, fmt.Errorf("raw message to message error %w", err)
+		return nil, fmt.Errorf("raw message decode failed, %w", err)
 	}
 
 	return &room.Message{

@@ -24,7 +24,7 @@ func NewRemoteRoom(connection *room.Connection, opt *room.Info, eventEmitter eve
 		createdAt:    time.Now(),
 		activeAt:     time.Now(),
 	}
-	r.log.Infof("创建remote房间 %s", opt.Address.ID)
+	r.log.Infof("remote room %s created", opt.Address.ID)
 	return r, nil
 }
 
@@ -49,7 +49,7 @@ func (r *remoteRoom) GetInfo() *room.Info {
 }
 
 func (r *remoteRoom) Start(ctx context.Context) error {
-	r.log.Infof("start remote房间 %s", r.opt.Address.ID)
+	r.log.Infof("remote room %s started", r.opt.Address.ID)
 	metric.Count("tunnel_remote_room", map[string]string{
 		"action": "start",
 		"code":   "success",
@@ -61,11 +61,11 @@ func (r *remoteRoom) Start(ctx context.Context) error {
 func (r *remoteRoom) message(ctx context.Context, msg *room.Message) error {
 	content, ok := msg.Content.(*room.MessageMessageContent)
 	if !ok {
-		return fmt.Errorf("message 消息内容格式错误")
+		return fmt.Errorf("message content is invalid")
 	}
 
 	if content.To == nil {
-		return fmt.Errorf("单播消息 to 字段为空")
+		return fmt.Errorf("unicast message's field 'to' is empty")
 	}
 
 	content.From = r.connection
@@ -90,7 +90,7 @@ func (r *remoteRoom) ping(ctx context.Context) error {
 func (r *remoteRoom) broadcast(ctx context.Context, msg *room.Message) error {
 	content, ok := msg.Content.(*room.BroadcastMessageContent)
 	if !ok {
-		return fmt.Errorf("message 消息内容格式错误")
+		return fmt.Errorf("message content is invalid")
 	}
 
 	content.From = r.connection
@@ -105,7 +105,7 @@ func (r *remoteRoom) broadcast(ctx context.Context, msg *room.Message) error {
 
 func (r *remoteRoom) SendMessage(ctx context.Context, msg *room.Message) error {
 	if room.NotMessageType(msg.Type) {
-		return fmt.Errorf("消息类型 %s 为错误消息类型", msg.Type)
+		return fmt.Errorf("message type %s not found", msg.Type)
 	}
 
 	r.activeAt = time.Now()
@@ -118,7 +118,7 @@ func (r *remoteRoom) SendMessage(ctx context.Context, msg *room.Message) error {
 		return r.ping(ctx)
 	}
 
-	return fmt.Errorf("发送消息类型 %s 不支持用户发送", msg.Type)
+	return fmt.Errorf("message type %s is not supported to be sent by normal user", msg.Type)
 }
 
 func (r *remoteRoom) OnMessage() chan *room.Message {
@@ -126,7 +126,7 @@ func (r *remoteRoom) OnMessage() chan *room.Message {
 }
 
 func (r *remoteRoom) Close(ctx context.Context) error {
-	r.log.Infof("close 房间")
+	r.log.Infof("room closed")
 	err := r.close(ctx)
 	if err != nil {
 		return err
@@ -152,20 +152,20 @@ func (r *remoteRoom) ShouldRemove() bool {
 func (r *remoteRoom) Listen(ctx context.Context, msg *event.Package) {
 	roomMsg, err := packageToRoomMessage(msg)
 	if err != nil {
-		r.log.WithError(err).Error("Listen messageToRoomMessage 处理消息错误")
+		r.log.WithError(err).Error("listen messageToRoomMessage failed")
 		return
 	}
 
 	select {
 	case r.messages <- roomMsg:
 		if roomMsg.Type == room.CloseType {
-			r.log.Infof("收到 close 消息")
-			r.Close(context.TODO())
+			r.log.Infof("received close message")
+			r.Close(ctx)
 		}
 
 		return
 	case <-ctx.Done():
-		r.log.Errorf("消费消息 %s 超时", msg.Content)
+		r.log.Errorf("consume message %s timeout", msg.Content)
 		return
 	}
 }

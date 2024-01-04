@@ -77,13 +77,13 @@ func NewAddressManager(c *config.Config) (*AddressManager, error) {
 
 	selfAddress := GetSelfAddress(c.RpcAddress)
 	if selfAddress == nil {
-		return nil, fmt.Errorf("多实例部署，获取本机地址错误，配置列表没有ip: %s信息", util.GetLocalIP())
+		return nil, fmt.Errorf("multi-instance deploy failed, IP %s not found in instances list of configuration", util.GetLocalIP())
 	}
 
 	selfId := ""
 
 	rm := map[string]*config.Address{}
-	a := []string{}
+	var a []string
 	for _, info := range c.RpcAddress {
 		key := fmt.Sprintf("%s:%s", info.Ip, info.Port)
 		rm[key] = info
@@ -96,17 +96,17 @@ func NewAddressManager(c *config.Config) (*AddressManager, error) {
 		newKey := fmt.Sprintf("A%d", i)
 		address := rm[key]
 		nAddress[newKey] = address
-		log.Infof("生成机器编号 %s => %s:%s", newKey, address.Ip, address.Port)
+		log.Infof("generate local machine ID %s => %s:%s", newKey, address.Ip, address.Port)
 		if address.Ip == selfAddress.Ip && address.Port == selfAddress.Port {
 			selfId = newKey
 		}
 	}
 
 	if selfId == "" {
-		return nil, fmt.Errorf("多实例部署生成本地编号错误")
+		return nil, fmt.Errorf("multi-instance deploy failed, generate local machine ID failed")
 	}
 
-	log.Infof("当前机器编号 %s", selfId)
+	log.Infof("current instance ID %s", selfId)
 	m := &AddressManager{
 		selfMachineId: selfId,
 		machineInfo:   nAddress,

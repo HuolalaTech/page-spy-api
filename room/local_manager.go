@@ -34,7 +34,7 @@ type LocalRoomManager struct {
 
 func (r *LocalRoomManager) Start() {
 	r.start()
-	r.log.Info("local room manager start")
+	r.log.Info("local room manager started")
 }
 
 func (r *LocalRoomManager) CreateConnection() (*room.Connection, error) {
@@ -72,7 +72,7 @@ func (r *LocalRoomManager) isFull() bool {
 
 func (r *LocalRoomManager) CreateRoom(ctx context.Context, info *room.Info) (room.Room, error) {
 	if r.isFull() {
-		return nil, errors.New("房间已经超过限制，不可以再创建房间")
+		return nil, errors.New("the maximum number of rooms has been reached and no more can be created")
 	}
 
 	room := NewLocalRoom(info, r.event, r.AddressManager)
@@ -88,7 +88,7 @@ func (r *LocalRoomManager) CreateRoom(ctx context.Context, info *room.Info) (roo
 func (r *LocalRoomManager) GetRoom(ctx context.Context, opt *room.Info) (room.Room, error) {
 	room, exist := r.getLocalRoom(opt)
 	if !exist {
-		return nil, roomApi.NewRoomNotFoundError("获取房间不存在")
+		return nil, roomApi.NewRoomNotFoundError(fmt.Sprintf("room %s not found", opt.Address.ID))
 	}
 
 	return room, nil
@@ -116,11 +116,11 @@ func (r *LocalRoomManager) getLocalRoom(opt *room.Info) (*localRoom, bool) {
 func (r *LocalRoomManager) JoinRoom(ctx context.Context, opt *room.Info, connection *room.Connection) error {
 	room, exist := r.getLocalRoom(opt)
 	if !exist {
-		return roomApi.NewRoomNotFoundError(fmt.Sprintf("加入房间%s不存在", opt.Address.ID))
+		return roomApi.NewRoomNotFoundError(fmt.Sprintf("room %s not found, join failed", opt.Address.ID))
 	}
 
 	if room.IsClose() {
-		return roomApi.NewRoomNotFoundError(fmt.Sprintf("加入房间%s已经关闭", opt.Address.ID))
+		return roomApi.NewRoomNotFoundError(fmt.Sprintf("room %s had been closed, join failed", opt.Address.ID))
 	}
 
 	err := room.Join(ctx, connection, opt)
@@ -134,7 +134,7 @@ func (r *LocalRoomManager) JoinRoom(ctx context.Context, opt *room.Info, connect
 func (r *LocalRoomManager) LeaveRoom(ctx context.Context, opt *room.Info, connection *room.Connection) error {
 	room, exist := r.getLocalRoom(opt)
 	if !exist {
-		return roomApi.NewRoomNotFoundError(fmt.Sprintf("离开房间%s不存在", opt.Address.ID))
+		return roomApi.NewRoomNotFoundError(fmt.Sprintf("room %s not found, leave failed", opt.Address.ID))
 	}
 
 	if room.IsClose() {
@@ -147,7 +147,7 @@ func (r *LocalRoomManager) LeaveRoom(ctx context.Context, opt *room.Info, connec
 	}
 
 	if room.ShouldRemove() {
-		r.log.WithError(err).Errorf("room manager close room %s ", opt.Address.ID)
+		r.log.WithError(err).Errorf("room manager close room %s", opt.Address.ID)
 		r.removeRoom(room)
 		return room.Close(ctx)
 	}

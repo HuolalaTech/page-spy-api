@@ -16,7 +16,7 @@ import (
 
 func NewLocalRoom(opt *room.Info, event event.EventEmitter, addressManager *rpc.AddressManager) room.Room {
 	logger := log.WithField("room", opt.Address.ID)
-	logger.Infof("创建local房间")
+	logger.Infof("local room created")
 	opt.Connections = make([]*room.Connection, 0)
 	return &localRoom{
 		basicRoom: newBasicRoom(),
@@ -59,7 +59,7 @@ func (r *localRoom) GetTags() map[string]string {
 }
 
 func (r *localRoom) Start(ctx context.Context) error {
-	r.log.Infof("start 房间")
+	r.log.Infof("room started")
 	metric.Count("tunnel_local_room", map[string]string{
 		"action": "start",
 		"code":   "success",
@@ -73,7 +73,7 @@ func (r *localRoom) Start(ctx context.Context) error {
 				} else {
 					err := r.SendMessage(context.Background(), msg)
 					if err != nil {
-						r.log.WithError(err).Errorf("本地房间广播消息房间错误%s", err.Error())
+						r.log.WithError(err).Errorf("local room broadcast messages failed, %s", err)
 					}
 				}
 			case <-r.Done():
@@ -118,14 +118,14 @@ func (r *localRoom) Join(ctx context.Context, connection *room.Connection, opt *
 	}
 
 	if !r.Info.Address.Equal(opt.Address) {
-		return fmt.Errorf("connection %s join 房间地址错误，错误地址%s", connection.Address.ID, opt.Address.ID)
+		return fmt.Errorf("connection %s join room %s failed", connection.Address.ID, opt.Address.ID)
 	}
 
 	if r.Info.Password != opt.Password {
-		return fmt.Errorf("join 房间 %s 密码错误", opt.Password)
+		return fmt.Errorf("join failed, password from connection %s of room %s is invalid, correct password is %s", connection.Address.ID, opt.Address.ID, opt.Password)
 	}
 
-	r.log.Infof("connection %s join 房间", connection.Address.ID)
+	r.log.Infof("connection %s joined room", connection.Address.ID)
 	r.addConnectionWithLock(connection)
 	r.SendMessageWithTimeout(room.NewJoinMessage(connection), 5*time.Second)
 	r.SetStatus(state.RunningStatus)
@@ -138,14 +138,14 @@ func (r *localRoom) Leave(ctx context.Context, connection *room.Connection, opt 
 	}
 
 	if !r.Info.Address.Equal(opt.Address) {
-		return fmt.Errorf("connection %s leave 房间地址错误，错误地址%s", connection.Address.ID, opt.Address.ID)
+		return fmt.Errorf("connection %s leave room %s failed", connection.Address.ID, opt.Address.ID)
 	}
 
 	if r.Info.Password != opt.Password {
-		return fmt.Errorf("leave 房间 %s 密码错误", opt.Password)
+		return fmt.Errorf("leave failed, password from connection %s of room %s is invalid, correct password is %s", connection.Address.ID, opt.Address.ID, opt.Password)
 	}
 
-	r.log.Infof("connection %s leave 房间", connection.Address.ID)
+	r.log.Infof("connection %s left room %s", connection.Address.ID, opt.Address.ID)
 	r.removeConnectionWithLock(connection)
 	r.SendMessageWithTimeout(room.NewLeaveMessage(connection), 5*time.Second)
 	return nil
@@ -171,7 +171,7 @@ func (r *localRoom) otherMessage(ctx context.Context, msg *room.Message) error {
 	for _, c := range connections {
 		e := r.event.Emit(ctx, c.Address, eventMsg)
 		if e != nil {
-			r.log.WithError(e).Errorf("Emit connection 消息错误 %s %s", c.Address.ID, e.Error())
+			r.log.WithError(e).Errorf("emit connection %s message failed, %s", c.Address.ID, e)
 			err = e
 		}
 	}
@@ -182,7 +182,7 @@ func (r *localRoom) otherMessage(ctx context.Context, msg *room.Message) error {
 func (r *localRoom) broadcastMessage(ctx context.Context, msg *room.Message) error {
 	content, ok := msg.Content.(*room.BroadcastMessageContent)
 	if !ok {
-		return fmt.Errorf("message 消息内容格式错误")
+		return fmt.Errorf("message format is invalid")
 	}
 
 	connections := r.getConnectionsWithLock()
@@ -196,7 +196,7 @@ func (r *localRoom) broadcastMessage(ctx context.Context, msg *room.Message) err
 		if !(c.Address.Equal(content.From.Address) && !content.IncludeSelf) {
 			e := r.event.Emit(ctx, c.Address, eventMsg)
 			if e != nil {
-				r.log.WithError(e).Errorf("Emit connection 消息错误 %s %s", c.Address.ID, e.Error())
+				r.log.WithError(e).Errorf("emit connection %s message failed, %s", c.Address.ID, e.Error())
 				err = e
 			}
 		}
@@ -208,11 +208,11 @@ func (r *localRoom) broadcastMessage(ctx context.Context, msg *room.Message) err
 func (r *localRoom) messageMessage(ctx context.Context, msg *room.Message) error {
 	content, ok := msg.Content.(*room.MessageMessageContent)
 	if !ok {
-		return fmt.Errorf("message 消息内容格式错误")
+		return fmt.Errorf("message format is invalid")
 	}
 
 	if content.To == nil {
-		return fmt.Errorf("单播消息 to 字段为空")
+		return fmt.Errorf("unicast message's field 'to' is empty")
 	}
 
 	connections := r.getConnectionsWithLock()
@@ -226,7 +226,7 @@ func (r *localRoom) messageMessage(ctx context.Context, msg *room.Message) error
 		if c.Address.Equal(content.To.Address) {
 			e := r.event.Emit(ctx, c.Address, eventMsg)
 			if e != nil {
-				r.log.WithError(e).Errorf("Emit connection 消息错误 %s %s", c.Address.ID, e.Error())
+				r.log.WithError(e).Errorf("emit connection %s message failed, %s", c.Address.ID, e.Error())
 				err = e
 			}
 		}
@@ -237,7 +237,7 @@ func (r *localRoom) messageMessage(ctx context.Context, msg *room.Message) error
 
 func (r *localRoom) SendMessage(ctx context.Context, msg *room.Message) error {
 	if room.NotMessageType(msg.Type) {
-		return fmt.Errorf("消息类型 %s 为错误消息类型", msg.Type)
+		return fmt.Errorf("message type %s not found", msg.Type)
 	}
 
 	r.Info.ActiveAt = time.Now()
@@ -258,7 +258,7 @@ func (r *localRoom) SendMessage(ctx context.Context, msg *room.Message) error {
 		return r.otherMessage(ctx, msg)
 	}
 
-	return fmt.Errorf("发送消息类型 %s 不支持用户发送", msg.Type)
+	return fmt.Errorf("message type %s is not supported to be sent by normal user", msg.Type)
 }
 
 func (r *localRoom) SendMessageWithTimeout(msg *room.Message, timeout time.Duration) {
@@ -289,7 +289,7 @@ func (r *localRoom) Close(ctx context.Context) error {
 	}
 
 	r.event.RemoveListener(r.Info.Address, r)
-	r.log.Infof("房间close %s", r.closeReason)
+	r.log.Infof("room closed, %s", r.closeReason)
 	r.SendMessageWithTimeout(room.NewCloseMessage(*r.Info.Address, r.closeReason), 5*time.Second)
 	return nil
 }
@@ -306,16 +306,16 @@ func (r *localRoom) ShouldRemove() bool {
 	maxTimeRoom := now.Sub(r.Info.CreatedAt) > 1*time.Hour
 	switch true {
 	case noUseInitRoom:
-		r.closeReason = "房间初始化以后，超过1分钟没有用户连接"
+		r.closeReason = "no user connection for more than 1 minute after room setup"
 		r.closeCode = "noUseInitRoom"
 	case noUserRoom:
-		r.closeReason = "房间所有用户离开1分钟没有重连"
+		r.closeReason = "all the user of room left over 1 minutes"
 		r.closeCode = "noUserRoom"
 	case noUseRoom:
-		r.closeReason = "房间超过5分钟没有活动"
+		r.closeReason = "room idle over 5 minutes"
 		r.closeCode = "noUseRoom"
 	case maxTimeRoom:
-		r.closeReason = "房间超过最长持续时间1小时"
+		r.closeReason = "room exceeded the maximum time 1 hour"
 		r.closeCode = "maxTimeRoom"
 	}
 
@@ -330,7 +330,7 @@ func (r *localRoom) isEmpty() bool {
 func (r *localRoom) Listen(ctx context.Context, pkg *event.Package) {
 	roomMsg, err := packageToRoomMessage(pkg)
 	if err != nil {
-		r.log.WithError(err).Error("监听消息错误")
+		r.log.WithError(err).Error("listen message failed")
 		return
 	}
 
@@ -338,7 +338,7 @@ func (r *localRoom) Listen(ctx context.Context, pkg *event.Package) {
 	case r.messages <- roomMsg:
 		return
 	case <-ctx.Done():
-		r.log.Errorf("监听消息%s超时", pkg.Content)
+		r.log.Errorf("listen message %s timeout", pkg.Content)
 		return
 	}
 }
