@@ -33,18 +33,18 @@ func (r *BasicManager) addRoom(room room.ManagerRoom) {
 	r.roomsMap[room.GetRoomAddress().ID] = room
 }
 
-func equalTags(old map[string]string, new map[string]string) bool {
-	if len(old) <= 0 && len(new) <= 0 {
+func likeTags(origin map[string]string, condition map[string]string) bool {
+	if len(origin) <= 0 && len(condition) <= 0 {
 		return true
 	}
 
-	if len(new) <= 0 || len(old) <= 0 {
+	if len(condition) <= 0 || len(origin) <= 0 {
 		return false
 	}
 
-	for k, v := range new {
+	for k, v := range condition {
 		r := strings.Contains(
-			strings.ToLower(old[k]),
+			strings.ToLower(origin[k]),
 			strings.ToLower(v),
 		)
 		if !r {
@@ -64,7 +64,7 @@ func (r *BasicManager) getRoomsByTags(tags map[string]string) []room.ManagerRoom
 
 	for _, rr := range rooms {
 		if rr.GetInfo() != nil && len(rr.GetInfo().Tags) > 0 {
-			if equalTags(rr.GetInfo().Tags, tags) {
+			if likeTags(rr.GetInfo().Tags, tags) {
 				ret = append(ret, rr)
 			}
 		}
