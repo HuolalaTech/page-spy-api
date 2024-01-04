@@ -2,6 +2,7 @@ package room
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -42,7 +43,11 @@ func equalTags(old map[string]string, new map[string]string) bool {
 	}
 
 	for k, v := range new {
-		if old[k] != v {
+		r := strings.Contains(
+			strings.ToLower(old[k]),
+			strings.ToLower(v),
+		)
+		if !r {
 			return false
 		}
 	}
