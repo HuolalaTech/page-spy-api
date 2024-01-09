@@ -106,9 +106,31 @@ func (r *RemoteRpcRoomManager) CreateConnection() *room.Connection {
 		CreatedAt: time.Now(),
 	}
 }
+func (r *RemoteRpcRoomManager) CreateLocalRoom(ctx context.Context, info *room.Info) (room.Room, error) {
+	return r.localRoomManager.CreateRoom(ctx, info)
+}
 
 func (r *RemoteRpcRoomManager) CreateRoom(ctx context.Context, info *room.Info) (room.Room, error) {
-	return r.localRoomManager.CreateRoom(ctx, info)
+	if r.AddressManager.IsSelfMachineAddress(info.Address) {
+		return r.CreateLocalRoom(ctx, info)
+	}
+
+	return r.CreateRemoteRoom(ctx, info)
+}
+
+func (r *RemoteRpcRoomManager) CreateRemoteRoom(ctx context.Context, info *room.Info) (room.Room, error) {
+	req := NewRpcLocalRoomManagerRequest()
+	req.Info = info
+	res := NewRpcLocalRoomManagerResponse()
+	rpcClient, err := r.getRpcByAddress(info.Address)
+	if err != nil {
+		return nil, err
+	}
+	err = rpcClient.Call(ctx, "LocalRpcRoomManager.CreateRoom", req, res)
+	if err != nil {
+		return nil, err
+	}
+	return res.Room, nil
 }
 
 func (r *RemoteRpcRoomManager) GetRoomUsers(ctx context.Context, info *room.Info) ([]*room.Connection, error) {
@@ -182,7 +204,7 @@ func (r *RemoteRpcRoomManager) LeaveRoom(ctx context.Context, info *room.Info, c
 }
 
 func (r *RemoteRpcRoomManager) CreateAndJoinRoom(ctx context.Context, connection *room.Connection, opt *room.Info) (room.RemoteRoom, error) {
-	room, err := r.CreateRoom(ctx, opt)
+	room, err := r.CreateLocalRoom(ctx, opt)
 	if err != nil {
 		return nil, err
 	}
@@ -204,6 +226,28 @@ func (r *RemoteRpcRoomManager) CreateAndJoinRoom(ctx context.Context, connection
 	}
 
 	return remoteRoom, nil
+}
+
+func (r *RemoteRpcRoomManager) ForceJoinRoom(ctx context.Context, connection *room.Connection, opt *room.Info) (room.RemoteRoom, error) {
+	rm, err := r.JoinRoom(ctx, connection, opt)
+	if err != nil {
+		re, ok := err.(*room.Error)
+		if !ok || re.Code != room.RoomNotFoundError {
+			return nil, err
+		}
+
+		_, err = r.CreateRoom(ctx, room.NewRoomInfo(opt.Name, opt.Password, opt.Group, opt.Address))
+		if err != nil {
+			return nil, err
+		}
+
+		rm, err = r.JoinRoom(ctx, connection, opt)
+		if err != nil {
+			return nil, fmt.Errorf("force create room error %w", err)
+		}
+	}
+
+	return rm, nil
 }
 
 func (r *RemoteRpcRoomManager) JoinRoom(ctx context.Context, connection *room.Connection, opt *room.Info) (room.RemoteRoom, error) {

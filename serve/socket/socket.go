@@ -135,12 +135,12 @@ func readClientMessage(ctx context.Context, socket *socket, room roomApi.RemoteR
 	msg, err := rawMsg.ToMessage()
 
 	if err != nil {
-		socket.writeWebsocketError(roomApi.NewRoomCloseError("message transform failed, %s", err))
+		socket.writeWebsocketError(roomApi.NewClientError("message transform failed, %s", err))
 		return nil
 	}
 
 	if !roomApi.IsPublicMessageType(msg.Type) {
-		socket.writeWebsocketError(roomApi.NewRoomCloseError("message type %s is not supported to be sent by frontend", msg.Type))
+		socket.writeWebsocketError(roomApi.NewClientError("message type %s is not supported to be sent by frontend", msg.Type))
 		return nil
 	}
 	log.Debugf("socket received %s", msg.Type)
@@ -311,7 +311,7 @@ func (s *WebSocket) CreateRoom(rw http.ResponseWriter, r *http.Request) {
 
 	opt := roomApi.NewRoomInfo(name, address.ID, group, address)
 	opt.Tags = tags
-	_, err := s.roomManager.CreateRoom(r.Context(), opt)
+	_, err := s.roomManager.CreateLocalRoom(r.Context(), opt)
 	if err != nil {
 		writeResponse(rw, NewErrorResponse(err))
 		return
@@ -338,6 +338,7 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 	group := r.URL.Query().Get("group")
 	name := r.URL.Query().Get("name")
 	userId := r.URL.Query().Get("userId")
+	forceCreate := r.URL.Query().Get("forceCreate")
 	address, err := eventApi.NewAddressFromID(id)
 	socket := &socket{conn: conn}
 	if err != nil {
@@ -354,9 +355,15 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 		Group:    group,
 	}
 
-	room, err := s.roomManager.JoinRoom(r.Context(), connection, opt)
+	var room roomApi.RemoteRoom
+	if forceCreate == "true" {
+		room, err = s.roomManager.ForceJoinRoom(r.Context(), connection, opt)
+	} else {
+		room, err = s.roomManager.JoinRoom(r.Context(), connection, opt)
+	}
+
 	if err != nil {
-		socket.writeWebsocketError(fmt.Errorf("room join failed, %w", err))
+		socket.writeWebsocketError(fmt.Errorf("get room user list failed, %w", err))
 		return
 	}
 

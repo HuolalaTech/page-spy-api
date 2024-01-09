@@ -41,6 +41,7 @@ const (
 	NetWorkTimeoutError = "NetWorkTimeoutError"
 	MessageContentError = "MessageContentError"
 	ServeError          = "ServeError"
+	ClientError         = "ClientError"
 )
 
 type Error struct {
@@ -84,4 +85,8 @@ func NewNetWorkTimeoutError(msg string, a ...any) *Error {
 
 func NewServeError(msg string, a ...any) *Error {
 	return NewErrorWithCode(fmt.Sprintf(msg, a...), ServeError)
+}
+
+func NewClientError(msg string, a ...any) *Error {
+	return NewErrorWithCode(fmt.Sprintf(msg, a...), ClientError)
 }
