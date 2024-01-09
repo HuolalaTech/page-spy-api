@@ -20,3 +20,22 @@ func GetLocalIP() string {
 
 	return ""
 }
+
+func GetLocalIPList() []string {
+	addrs, err := net.InterfaceAddrs()
+
+	arr := []string{}
+	if err != nil {
+		return arr
+	}
+
+	for _, address := range addrs {
+		if ipNet, ok := address.(*net.IPNet); ok && !ipNet.IP.IsLoopback() {
+			if ipNet.IP.To4() != nil {
+				arr = append(arr, ipNet.IP.String())
+			}
+		}
+	}
+
+	return arr
+}

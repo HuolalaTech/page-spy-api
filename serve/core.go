@@ -18,7 +18,9 @@ func Run() {
 			version = "local"
 		}
 		log.Infof("server info: %s@%s", version, hash)
-		log.Infof("LAN address http://%s:%s", util.GetLocalIP(), config.Port)
+		for _, ip := range util.GetLocalIPList() {
+			log.Infof("LAN address http://%s:%s", ip, config.Port)
+		}
 		log.Infof("Local address http://localhost:%s", config.Port)
 		e.Logger.Fatal(e.Start(":" + config.Port))
 	})
