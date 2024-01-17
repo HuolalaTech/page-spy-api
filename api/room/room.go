@@ -133,8 +133,9 @@ type ErrorMessageContent struct {
 
 func NewPingMessage(from event.Address) *Message {
 	return &Message{
-		Type:    PingType,
-		Content: &PingContent{From: from},
+		Type:      PingType,
+		CreatedAt: time.Now().UnixNano() / int64(time.Millisecond),
+		Content:   &PingContent{From: from},
 	}
 }
 
@@ -145,15 +146,17 @@ type StartOrCloseMessageContent struct {
 
 func NewStartMessage(roomAddress event.Address) *Message {
 	return &Message{
-		Type:    StartType,
-		Content: &StartOrCloseMessageContent{RoomAddress: roomAddress},
+		Type:      StartType,
+		CreatedAt: time.Now().UnixNano() / int64(time.Millisecond),
+		Content:   &StartOrCloseMessageContent{RoomAddress: roomAddress},
 	}
 }
 
 func NewCloseMessage(roomAddress event.Address, reason string) *Message {
 	return &Message{
-		Type:    CloseType,
-		Content: &StartOrCloseMessageContent{RoomAddress: roomAddress, Reason: reason},
+		Type:      CloseType,
+		CreatedAt: time.Now().UnixNano() / int64(time.Millisecond),
+		Content:   &StartOrCloseMessageContent{RoomAddress: roomAddress, Reason: reason},
 	}
 }
 
@@ -164,8 +167,9 @@ type ConnectMessageContent struct {
 
 func NewConnectMessage(selfConnection *Connection, roomConnections []*Connection) *Message {
 	return &Message{
-		Type:    ConnectType,
-		Content: &ConnectMessageContent{SelfConnection: selfConnection, RoomConnections: roomConnections},
+		Type:      ConnectType,
+		CreatedAt: time.Now().UnixNano() / int64(time.Millisecond),
+		Content:   &ConnectMessageContent{SelfConnection: selfConnection, RoomConnections: roomConnections},
 	}
 }
 
@@ -175,15 +179,17 @@ type JoinOrLeaveMessageContent struct {
 
 func NewLeaveMessage(connection *Connection) *Message {
 	return &Message{
-		Type:    LeaveType,
-		Content: &JoinOrLeaveMessageContent{Connection: connection},
+		Type:      LeaveType,
+		CreatedAt: time.Now().UnixNano() / int64(time.Millisecond),
+		Content:   &JoinOrLeaveMessageContent{Connection: connection},
 	}
 }
 
 func NewJoinMessage(connection *Connection) *Message {
 	return &Message{
-		Type:    JoinType,
-		Content: &JoinOrLeaveMessageContent{Connection: connection},
+		Type:      JoinType,
+		CreatedAt: time.Now().UnixNano() / int64(time.Millisecond),
+		Content:   &JoinOrLeaveMessageContent{Connection: connection},
 	}
 }
 
@@ -201,7 +207,8 @@ type BroadcastMessageContent struct {
 
 func NewBroadcastMessage(data interface{}, from *Connection) *Message {
 	return &Message{
-		Type: BroadcastType,
+		Type:      BroadcastType,
+		CreatedAt: time.Now().UnixNano() / int64(time.Millisecond),
 		Content: &BroadcastMessageContent{
 			Data: data,
 			From: from,
@@ -211,7 +218,8 @@ func NewBroadcastMessage(data interface{}, from *Connection) *Message {
 
 func NewSendMessage(data string, from *Connection, to *Connection) *Message {
 	return &Message{
-		Type: MessageType,
+		Type:      MessageType,
+		CreatedAt: time.Now().UnixNano() / int64(time.Millisecond),
 		Content: &MessageMessageContent{
 			Data: data,
 			From: from,

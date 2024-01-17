@@ -63,6 +63,8 @@ func (a *Address) UnmarshalJSON(data []byte) error {
 
 type Package struct {
 	From       *Address        `json:"from"`
+	CreatedAt  int64           `json:"createdAt"`
+	RequestId  string          `json:"requestId"`
 	RoutingKey string          `json:"routingKey"`
 	Content    json.RawMessage `json:"content"`
 }

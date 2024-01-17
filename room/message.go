@@ -16,6 +16,8 @@ func roomMessageToPackage(msg *room.Message, from *event.Address) (*event.Packag
 
 	return &event.Package{
 		From:       from,
+		CreatedAt:  msg.CreatedAt,
+		RequestId:  msg.RequestId,
 		RoutingKey: msg.Type,
 		Content:    bs,
 	}, nil
@@ -29,7 +31,9 @@ func packageToRoomMessage(pkg *event.Package) (*room.Message, error) {
 	}
 
 	return &room.Message{
-		Type:    pkg.RoutingKey,
-		Content: content,
+		CreatedAt: pkg.CreatedAt,
+		RequestId: pkg.RequestId,
+		Type:      pkg.RoutingKey,
+		Content:   content,
 	}, nil
 }
