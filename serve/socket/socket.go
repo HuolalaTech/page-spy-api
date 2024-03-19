@@ -15,35 +15,13 @@ import (
 	"github.com/HuolalaTech/page-spy-api/logger"
 	"github.com/HuolalaTech/page-spy-api/metric"
 	"github.com/HuolalaTech/page-spy-api/room"
+	"github.com/HuolalaTech/page-spy-api/serve/common"
 	"github.com/gorilla/websocket"
 )
 
 var joinLog = logger.Log().WithField("module", "join")
 
-type Response struct {
-	Code    string      `json:"code"`
-	Data    interface{} `json:"data"`
-	Success bool        `json:"success"`
-	Message string      `json:"message"`
-}
-
-func NewErrorResponse(err error) *Response {
-	return &Response{
-		Code:    "error",
-		Success: false,
-		Message: err.Error(),
-	}
-}
-
-func NewSuccessResponse(data interface{}) *Response {
-	return &Response{
-		Code:    "success",
-		Data:    data,
-		Success: true,
-	}
-}
-
-func writeResponse(w http.ResponseWriter, res *Response) {
+func writeResponse(w http.ResponseWriter, res *common.Response) {
 	if res.Success {
 		w.WriteHeader(http.StatusOK)
 	} else {
@@ -273,11 +251,11 @@ func (s *WebSocket) ListRooms(rw http.ResponseWriter, r *http.Request) {
 	tags := getTags(r.URL.Query())
 	rooms, err := s.roomManager.ListRooms(r.Context(), tags)
 	if err != nil {
-		writeResponse(rw, NewErrorResponse(err))
+		writeResponse(rw, common.NewErrorResponse(err))
 		return
 	}
 
-	writeResponse(rw, NewSuccessResponse(rooms))
+	writeResponse(rw, common.NewSuccessResponse(rooms))
 }
 
 type CreateRoomParams struct {
@@ -305,7 +283,7 @@ func (s *WebSocket) CreateRoom(rw http.ResponseWriter, r *http.Request) {
 	group := r.URL.Query().Get("group")
 	tags := getTags(r.URL.Query())
 	if name == "" || group == "" {
-		writeResponse(rw, NewErrorResponse(errors.New("name or group missing")))
+		writeResponse(rw, common.NewErrorResponse(errors.New("name or group missing")))
 		return
 	}
 
@@ -313,7 +291,7 @@ func (s *WebSocket) CreateRoom(rw http.ResponseWriter, r *http.Request) {
 	opt.Tags = tags
 	_, err := s.roomManager.CreateLocalRoom(r.Context(), opt)
 	if err != nil {
-		writeResponse(rw, NewErrorResponse(err))
+		writeResponse(rw, common.NewErrorResponse(err))
 		return
 	}
 
@@ -323,7 +301,7 @@ func (s *WebSocket) CreateRoom(rw http.ResponseWriter, r *http.Request) {
 	}, 1)
 
 	joinLog.Infof("create group %s room", group)
-	writeResponse(rw, NewSuccessResponse(opt))
+	writeResponse(rw, common.NewSuccessResponse(opt))
 }
 
 func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
