@@ -31,7 +31,7 @@ func (c *CoreApi) GetMachineIdByFileName(name string) (string, error) {
 	if len(names) != 2 {
 		return "", fmt.Errorf("file name format error")
 	}
-	return names[1], nil
+	return names[0], nil
 }
 
 type EmptyReaderClose struct {

@@ -5,51 +5,53 @@ import (
 	"net/http/httputil"
 	"net/url"
 
+	"github.com/HuolalaTech/page-spy-api/config"
 	"github.com/HuolalaTech/page-spy-api/rpc"
 	"github.com/labstack/echo/v4"
 )
 
+type proxyInfo struct {
+	host  string
+	proxy *httputil.ReverseProxy
+}
+
 type ProxyManager struct {
-	proxies        map[string]*httputil.ReverseProxy
+	info           map[string]*proxyInfo
 	addressManager *rpc.AddressManager
 }
 
 func (pm *ProxyManager) Proxy(machineId string, c echo.Context) error {
-	p, ok := pm.proxies[machineId]
+	info, ok := pm.info[machineId]
 	if !ok {
 		return fmt.Errorf("get proxy by machineId %s not found", machineId)
 	}
 
-	c.Request().Host = pm.getProxyHost(machineId)
-	p.ServeHTTP(c.Response(), c.Request())
+	c.Request().Host = info.host
+	info.proxy.ServeHTTP(c.Response(), c.Request())
 	return nil
 }
 
-func (pm *ProxyManager) getProxyHost(findId string) string {
-	for machineId, address := range pm.addressManager.GetMachineIpInfo() {
-		if machineId == findId {
-			return fmt.Sprintf("http://%s:%s", address.Ip, address.Port)
-		}
-	}
-	return ""
-}
-
-func NewProxy(addressManager *rpc.AddressManager) (*ProxyManager, error) {
-	proxies := make(map[string]*httputil.ReverseProxy)
+func NewProxy(config *config.Config, addressManager *rpc.AddressManager) (*ProxyManager, error) {
+	proxies := make(map[string]*proxyInfo)
 
 	for machineId, address := range addressManager.GetMachineIpInfo() {
-		u := fmt.Sprintf("http://%s:%s", address.Ip, address.Port)
+		host := fmt.Sprintf("%s:%s", address.Ip, "6753")
+		// host := fmt.Sprintf("%s:%s", address.Ip, config.Port)
+		u := fmt.Sprintf("http://%s", host)
 		proxyURL, err := url.Parse(u)
 		if err != nil {
 			return nil, fmt.Errorf("parse url %s error", u)
 		}
 
 		reverseProxy := httputil.NewSingleHostReverseProxy(proxyURL)
-		proxies[machineId] = reverseProxy
+		proxies[machineId] = &proxyInfo{
+			host:  host,
+			proxy: reverseProxy,
+		}
 	}
 
 	return &ProxyManager{
-		proxies:        proxies,
+		info:           proxies,
 		addressManager: addressManager,
 	}, nil
 }

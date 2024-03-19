@@ -5,6 +5,7 @@ import (
 
 	"github.com/HuolalaTech/page-spy-api/config"
 	"github.com/HuolalaTech/page-spy-api/data"
+	"github.com/HuolalaTech/page-spy-api/proxy"
 	"github.com/HuolalaTech/page-spy-api/rpc"
 	"github.com/HuolalaTech/page-spy-api/serve/route"
 	"github.com/HuolalaTech/page-spy-api/serve/socket"
@@ -38,6 +39,11 @@ func initContainer() (*dig.Container, error) {
 		return nil, err
 	}
 	err = container.Provide(storage.NewStorage)
+
+	if err != nil {
+		return nil, err
+	}
+	err = container.Provide(proxy.NewProxy)
 
 	if err != nil {
 		return nil, err
