@@ -35,8 +35,7 @@ func NewProxy(config *config.Config, addressManager *rpc.AddressManager) (*Proxy
 	proxies := make(map[string]*proxyInfo)
 
 	for machineId, address := range addressManager.GetMachineIpInfo() {
-		host := fmt.Sprintf("%s:%s", address.Ip, "6753")
-		// host := fmt.Sprintf("%s:%s", address.Ip, config.Port)
+		host := fmt.Sprintf("%s:%s", address.Ip, config.Port)
 		u := fmt.Sprintf("http://%s", host)
 		proxyURL, err := url.Parse(u)
 		if err != nil {
