@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/HuolalaTech/page-spy-api/config"
+	"github.com/HuolalaTech/page-spy-api/proxy"
 	"github.com/HuolalaTech/page-spy-api/serve/common"
 	selfMiddleware "github.com/HuolalaTech/page-spy-api/serve/middleware"
 	"github.com/HuolalaTech/page-spy-api/serve/socket"
@@ -16,7 +17,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, staticConfig *config.StaticConfig) *echo.Echo {
+func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, proxyManager *proxy.ProxyManager, staticConfig *config.StaticConfig) *echo.Echo {
 	e := echo.New()
 	e.Use(selfMiddleware.Logger())
 	e.Use(selfMiddleware.Error())
@@ -40,11 +41,14 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, sta
 	})
 
 	route.GET("/log/download", func(c echo.Context) error {
-		return nil
-	})
-
-	route.GET("/local/log/download", func(c echo.Context) error {
 		fileId := c.QueryParam("fileId")
+		machine, err := core.GetMachineIdByFileName(fileId)
+		if err != nil {
+			return err
+		}
+		if !core.IsSelfMachine(machine) {
+			return proxyManager.Proxy(machine, c)
+		}
 
 		file, err := core.GetFile(fileId)
 		if err != nil {
@@ -64,10 +68,17 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, sta
 		return nil
 	})
 
-	route.DELETE("/local/log/delete", func(c echo.Context) error {
+	route.GET("/log/delete", func(c echo.Context) error {
 		fileId := c.QueryParam("fileId")
+		machine, err := core.GetMachineIdByFileName(fileId)
+		if err != nil {
+			return err
+		}
+		if !core.IsSelfMachine(machine) {
+			return proxyManager.Proxy(machine, c)
+		}
 
-		err := core.DeleteFile(fileId)
+		err = core.DeleteFile(fileId)
 		if err != nil {
 			return err
 		}

@@ -22,6 +22,10 @@ func (c *CoreApi) CreateFileId(md5 string) string {
 	return fmt.Sprintf("%s.%s", c.addressManager.GetSelfMachineID(), md5)
 }
 
+func (c *CoreApi) IsSelfMachine(machineId string) bool {
+	return c.addressManager.GetSelfMachineID() == machineId
+}
+
 func (c *CoreApi) GetMachineIdByFileName(name string) (string, error) {
 	names := strings.Split(name, ".")
 	if len(names) != 2 {
