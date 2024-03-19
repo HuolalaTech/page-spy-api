@@ -12,9 +12,10 @@ type CorsConfig struct {
 }
 
 type Config struct {
-	Port       string      `json:"port"`
-	RpcAddress []*Address  `json:"rpcAddress"`
-	CorsConfig *CorsConfig `json:"corsConfig"`
+	Port           string      `json:"port"`
+	RpcAddress     []*Address  `json:"rpcAddress"`
+	CorsConfig     *CorsConfig `json:"corsConfig"`
+	MaxLogFileSize int64       `json:"maxLogFileSize"`
 }
 
 type Address struct {

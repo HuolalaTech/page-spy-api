@@ -2,6 +2,7 @@ bin/dist
 bin/config.json
 bin/__debug_bin
 bin_back
+log
 .vscode
 vendor
 .idea

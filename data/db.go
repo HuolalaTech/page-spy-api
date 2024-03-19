@@ -1,20 +1,50 @@
 package data
 
 import (
+	"fmt"
+	"time"
+
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
-var db *gorm.DB
+type Data struct {
+	db *gorm.DB
+}
 
-func init() {
-	var err error
-	db, err = gorm.Open(sqlite.Open("data.db"), &gorm.Config{})
+func NewData() (DataApi, error) {
+	db, err := gorm.Open(sqlite.Open("data.db"), &gorm.Config{})
 	if err != nil {
-		panic("failed to connect database")
+		return nil, fmt.Errorf("failed to connect database")
 	}
 
 	if err := db.AutoMigrate(&LogData{}); err != nil {
-		panic("failed to auto migrate database")
+		return nil, fmt.Errorf("failed to auto migrate database")
 	}
+
+	return &Data{db: db}, nil
+}
+
+func (d *Data) CreateLog(log *LogData) error {
+	return nil
+}
+
+func (d *Data) UpdateLog(log *LogData) error {
+	return nil
+}
+
+func (d *Data) FindLogByName(name string) (*LogData, error) {
+	return nil, nil
+}
+
+func (d *Data) FindTimeoutLogs(before time.Time) ([]*LogData, error) {
+	return nil, nil
+}
+
+func (d *Data) FindOldestLogs() ([]*LogData, error) {
+	return nil, nil
+}
+
+func (d *Data) CountLogsSize() (int64, error) {
+	return 0, nil
 }
