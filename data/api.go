@@ -4,11 +4,11 @@ import "time"
 
 type DataApi interface {
 	CreateLog(log *LogData) error
-	FindLogs(size int64, page int64) (*Page[*LogData], error)
+	FindLogs(size int, page int) (*Page[*LogData], error)
 	UpdateLogStatus(fileId string, status Status) error
-	DeleteLogByName(name string) error
-	FindLogByName(name string) (*LogData, error)
-	FindTimeoutLogs(before time.Time) ([]*LogData, error)
-	FindOldestLogs() ([]*LogData, error)
+	DeleteLogByFileId(fileId string) error
+	FindLogByFileId(fileId string) (*LogData, error)
+	FindTimeoutLogs(before time.Time, size int) ([]*LogData, error)
+	FindOldestLogs(size int) ([]*LogData, error)
 	CountLogsSize() (int64, error)
 }

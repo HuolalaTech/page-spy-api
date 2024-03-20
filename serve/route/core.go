@@ -70,6 +70,7 @@ func (c *CoreApi) CreateFile(file *storage.LogFile) (*storage.LogFile, error) {
 		Size:   file.Size,
 		Name:   file.Name,
 	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +83,7 @@ func (c *CoreApi) CreateFile(file *storage.LogFile) (*storage.LogFile, error) {
 	return file, c.data.UpdateLogStatus(file.FileId, data.Saved)
 }
 
-func (c *CoreApi) GetFileList(size int64, page int64) (*data.Page[*data.LogData], error) {
+func (c *CoreApi) GetFileList(size int, page int) (*data.Page[*data.LogData], error) {
 	return c.data.FindLogs(size, page)
 }
 
@@ -96,7 +97,7 @@ func (c *CoreApi) DeleteFile(fileId string) error {
 		return err
 	}
 
-	return c.data.DeleteLogByName(fileId)
+	return c.data.DeleteLogByFileId(fileId)
 }
 
 func (c *CoreApi) CleanFile() error {
