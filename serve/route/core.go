@@ -110,7 +110,7 @@ func (c *CoreApi) DeleteFile(fileId string) error {
 }
 
 func (c *CoreApi) CleanFileByTime() error {
-	before := time.Now().Add(-time.Duration(c.maxLife) * 24 * time.Hour)
+	before := time.Now().Add(-time.Duration(c.maxLife) * time.Hour)
 	logs, err := c.data.FindTimeoutLogs(before, 10)
 	if err != nil {
 		return err
@@ -172,12 +172,22 @@ func (c *CoreApi) CleanFile() error {
 }
 
 func NewCore(config *config.Config, storage storage.StorageApi, taskManager task.TaskManager, data data.DataApi, addressManager *rpc.AddressManager, rpcManager *rpc.RpcManager) (*CoreApi, error) {
+	maxLogFileSize := config.MaxLogFileSize
+	if config.MaxLogFileSize <= 0 {
+		maxLogFileSize = 10 * 1024 // default log size 10GB
+	}
+
+	maxLife := config.MaxLogLifeTime
+	if maxLife <= 0 {
+		maxLife = 30 * 24 // default log life 30 day
+	}
+
 	coreApi := &CoreApi{
 		storage:        storage,
 		data:           data,
 		addressManager: addressManager,
-		maxSize:        config.MaxLogFileSize * 1024 * 1024,
-		maxLife:        config.MaxLogLifeTime,
+		maxSize:        maxLogFileSize * 1024 * 1024,
+		maxLife:        maxLife,
 	}
 	err := taskManager.AddTask(task.NewTask("clean_file", 1*time.Hour, coreApi.CleanFile))
 	if err != nil {

@@ -39,6 +39,7 @@ func checkLocalConfigFile() error {
 	}
 	return nil
 }
+
 func loadLocalConfigFile() (*Config, error) {
 	config := &Config{}
 	f, err := os.Open(ConfigFileName)
