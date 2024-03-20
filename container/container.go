@@ -10,6 +10,7 @@ import (
 	"github.com/HuolalaTech/page-spy-api/serve/route"
 	"github.com/HuolalaTech/page-spy-api/serve/socket"
 	"github.com/HuolalaTech/page-spy-api/storage"
+	"github.com/HuolalaTech/page-spy-api/task"
 	"go.uber.org/dig"
 )
 
@@ -45,6 +46,11 @@ func initContainer() (*dig.Container, error) {
 	}
 	err = container.Provide(storage.NewStorage)
 
+	if err != nil {
+		return nil, err
+	}
+
+	err = container.Provide(task.NewTaskManager)
 	if err != nil {
 		return nil, err
 	}

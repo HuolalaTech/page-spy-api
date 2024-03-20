@@ -9,14 +9,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/HuolalaTech/page-spy-api/config"
 	"github.com/HuolalaTech/page-spy-api/data"
 	"github.com/HuolalaTech/page-spy-api/rpc"
 	"github.com/HuolalaTech/page-spy-api/storage"
+	"github.com/HuolalaTech/page-spy-api/task"
+	"github.com/labstack/gommon/log"
 )
 
 type CoreApi struct {
 	storage        storage.StorageApi
 	data           data.DataApi
+	maxSize        int64 // unit byte
+	maxLife        int64 // unit Hour
 	addressManager *rpc.AddressManager
 }
 
@@ -104,12 +109,81 @@ func (c *CoreApi) DeleteFile(fileId string) error {
 	return c.data.DeleteLogByFileId(fileId)
 }
 
-func (c *CoreApi) CleanFile() error {
+func (c *CoreApi) CleanFileByTime() error {
+	before := time.Now().Add(-time.Duration(c.maxLife) * 24 * time.Hour)
+	logs, err := c.data.FindTimeoutLogs(before, 10)
+	if err != nil {
+		return err
+	}
+
+	if logs == nil || len(logs) <= 0 {
+		return nil
+	}
+
+	log.Infof("clean file by time %d file timeout", len(logs))
+	for _, l := range logs {
+		err := c.DeleteFile(l.FileId)
+		if err != nil {
+			log.Errorf("delete file %s error %s", l.FileId, err.Error())
+		}
+		log.Infof("clean file %s name %s by time createdAt %s", l.FileId, l.Name, l.CreatedAt.String())
+	}
+
 	return nil
 }
 
-func NewCore(storage storage.StorageApi, data data.DataApi, addressManager *rpc.AddressManager, rpcManager *rpc.RpcManager) (*CoreApi, error) {
-	coreApi := &CoreApi{storage: storage, data: data, addressManager: addressManager}
+func (c *CoreApi) CleanFileBySize() error {
+	size, err := c.data.CountLogsSize()
+	if err != nil {
+		return err
+	}
+	if size < c.maxSize {
+		return nil
+	}
+
+	log.Infof("clean file by size %dmb > max size %dmb", size/(1024*1024), c.maxSize/(1024*1024))
+	logs, err := c.data.FindOldestLogs(10)
+	if err != nil {
+		return err
+	}
+
+	for _, l := range logs {
+		err := c.DeleteFile(l.FileId)
+		if err != nil {
+			log.Errorf("delete file %s error %s", l.FileId, err.Error())
+		}
+		log.Infof("clean file %s name %s by size", l.FileId, l.Name)
+	}
+
+	return nil
+}
+
+func (c *CoreApi) CleanFile() error {
+	err := c.CleanFileBySize()
+	if err != nil {
+		log.Errorf("clean file by size error %s", err.Error())
+	}
+	err = c.CleanFileByTime()
+	if err != nil {
+		log.Errorf("clean file by time error %s", err.Error())
+	}
+
+	return nil
+}
+
+func NewCore(config *config.Config, storage storage.StorageApi, taskManager task.TaskManager, data data.DataApi, addressManager *rpc.AddressManager, rpcManager *rpc.RpcManager) (*CoreApi, error) {
+	coreApi := &CoreApi{
+		storage:        storage,
+		data:           data,
+		addressManager: addressManager,
+		maxSize:        config.MaxLogFileSize * 1024 * 1024,
+		maxLife:        config.MaxLogLifeTime,
+	}
+	err := taskManager.AddTask(task.NewTask("clean_file", 1*time.Hour, coreApi.CleanFile))
+	if err != nil {
+		log.Errorf("add clean file task error %s", err.Error())
+	}
+
 	return coreApi, rpcManager.Regist("CoreApi", NewRpcCore(coreApi))
 }
 
