@@ -13,6 +13,11 @@ const (
 	Unknown Status = "未知"
 )
 
+type Page[T any] struct {
+	Total int64 `json:"total"`
+	Data  []T   `json:"data"`
+}
+
 type LogData struct {
 	gorm.Model
 	Status Status

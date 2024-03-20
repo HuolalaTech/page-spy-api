@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/HuolalaTech/page-spy-api/data"
 	"github.com/HuolalaTech/page-spy-api/rpc"
 	"github.com/HuolalaTech/page-spy-api/storage"
+	"gorm.io/gorm"
 )
 
 type CoreApi struct {
@@ -56,13 +58,32 @@ func (c *CoreApi) CreateFile(file *storage.LogFile) (*storage.LogFile, error) {
 
 	md5Sum := hash.Sum(nil)
 	md5String := hex.EncodeToString(md5Sum)
+
 	file.FileId = c.CreateFileId(md5String)
-	err := c.storage.SaveLog(file)
+	err := c.data.CreateLog(&data.LogData{
+		Model: gorm.Model{
+			UpdatedAt: time.Now(),
+			CreatedAt: time.Now(),
+		},
+		FileId: file.FileId,
+		Status: data.Created,
+		Size:   file.Size,
+		Name:   file.Name,
+	})
 	if err != nil {
-		return file, err
+		return nil, err
 	}
 
-	return file, nil
+	err = c.storage.SaveLog(file)
+	if err != nil {
+		return file, c.data.UpdateLogStatus(file.FileId, data.Error)
+	}
+
+	return file, c.data.UpdateLogStatus(file.FileId, data.Saved)
+}
+
+func (c *CoreApi) GetFileList(size int64, page int64) (*data.Page[*data.LogData], error) {
+	return c.data.FindLogs(size, page)
 }
 
 func (c *CoreApi) GetFile(fileId string) (*storage.LogFile, error) {
@@ -70,17 +91,19 @@ func (c *CoreApi) GetFile(fileId string) (*storage.LogFile, error) {
 }
 
 func (c *CoreApi) DeleteFile(fileId string) error {
-	return c.storage.RemoveLog(fileId)
+	err := c.storage.RemoveLog(fileId)
+	if err != nil {
+		return err
+	}
+
+	return c.data.DeleteLogByName(fileId)
 }
 
-func (c *CoreApi) DeleteTimeoutFile() error {
+func (c *CoreApi) CleanFile() error {
 	return nil
 }
 
-func (c *CoreApi) DeleteOldestFile() error {
-	return nil
-}
-
-func NewCore(storage storage.StorageApi, data data.DataApi, addressManager *rpc.AddressManager) *CoreApi {
-	return &CoreApi{storage: storage, data: data, addressManager: addressManager}
+func NewCore(storage storage.StorageApi, data data.DataApi, addressManager *rpc.AddressManager, rpcManager *rpc.RpcManager) (*CoreApi, error) {
+	coreApi := &CoreApi{storage: storage, data: data, addressManager: addressManager}
+	return coreApi, rpcManager.Regist("CoreApi", coreApi)
 }

@@ -29,7 +29,15 @@ func (d *Data) CreateLog(log *LogData) error {
 	return nil
 }
 
-func (d *Data) UpdateLog(log *LogData) error {
+func (d *Data) FindLogs(size int64, page int64) (*Page[*LogData], error) {
+	return nil, nil
+}
+
+func (d *Data) UpdateLogStatus(fileId string, status Status) error {
+	return nil
+}
+
+func (d *Data) DeleteLogByName(name string) error {
 	return nil
 }
 

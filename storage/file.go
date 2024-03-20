@@ -35,12 +35,12 @@ func (f *FileApi) SaveLog(log *LogFile) error {
 	return nil
 }
 
-func (f *FileApi) GetLog(name string) (*LogFile, error) {
-	if name == "" {
+func (f *FileApi) GetLog(fileId string) (*LogFile, error) {
+	if fileId == "" {
 		return nil, fmt.Errorf("get log file error: fileId is empty")
 	}
 
-	logFilePath := fmt.Sprintf("%s/%s", logDirPath, name)
+	logFilePath := fmt.Sprintf("%s/%s", logDirPath, fileId)
 
 	fileInfo, err := os.Stat(logFilePath)
 	if err != nil {
@@ -53,18 +53,18 @@ func (f *FileApi) GetLog(name string) (*LogFile, error) {
 	}
 
 	return &LogFile{
-		FileId: name,
+		FileId: fileId,
 		Size:   fileInfo.Size(),
 		File:   file,
 	}, nil
 }
 
-func (f *FileApi) RemoveLog(name string) error {
-	if name == "" {
-		return fmt.Errorf("remove log file error: name is empty")
+func (f *FileApi) RemoveLog(fileId string) error {
+	if fileId == "" {
+		return fmt.Errorf("remove log file error: fileId is empty")
 	}
 
-	filePath := fmt.Sprintf("%s/%s", logDirPath, name)
+	filePath := fmt.Sprintf("%s/%s", logDirPath, fileId)
 	_, err := os.Stat(filePath)
 	if os.IsNotExist(err) {
 		return nil
