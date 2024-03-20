@@ -23,6 +23,11 @@ func initContainer() (*dig.Container, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = container.Provide(rpc.NewRpcManager)
+	if err != nil {
+		return nil, err
+	}
+
 	err = container.Provide(socket.NewManager)
 	if err != nil {
 		return nil, err

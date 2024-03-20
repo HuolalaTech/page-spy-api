@@ -1,6 +1,8 @@
 package data
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 )
 
@@ -18,10 +20,17 @@ type Page[T any] struct {
 	Data  []T   `json:"data"`
 }
 
+type Model struct {
+	ID        uint           `gorm:"primarykey" json:"id"`
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
 type LogData struct {
-	gorm.Model
-	Status Status
-	Size   int64
-	FileId string
-	Name   string
+	Model
+	Status Status `json:"status"`
+	Size   int64  `json:"size"`
+	FileId string `gorm:"index:unique" json:"fileId"`
+	Name   string `json:"name"`
 }

@@ -5,19 +5,23 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/HuolalaTech/page-spy-api/data"
 	"github.com/HuolalaTech/page-spy-api/rpc"
 	"github.com/HuolalaTech/page-spy-api/storage"
-	"gorm.io/gorm"
 )
 
 type CoreApi struct {
 	storage        storage.StorageApi
 	data           data.DataApi
 	addressManager *rpc.AddressManager
+}
+
+type RcpCoreApi struct {
+	core *CoreApi
 }
 
 func (c *CoreApi) CreateFileId(md5 string) string {
@@ -61,7 +65,7 @@ func (c *CoreApi) CreateFile(file *storage.LogFile) (*storage.LogFile, error) {
 
 	file.FileId = c.CreateFileId(md5String)
 	err := c.data.CreateLog(&data.LogData{
-		Model: gorm.Model{
+		Model: data.Model{
 			UpdatedAt: time.Now(),
 			CreatedAt: time.Now(),
 		},
@@ -106,5 +110,26 @@ func (c *CoreApi) CleanFile() error {
 
 func NewCore(storage storage.StorageApi, data data.DataApi, addressManager *rpc.AddressManager, rpcManager *rpc.RpcManager) (*CoreApi, error) {
 	coreApi := &CoreApi{storage: storage, data: data, addressManager: addressManager}
-	return coreApi, rpcManager.Regist("CoreApi", coreApi)
+	return coreApi, rpcManager.Regist("CoreApi", NewRpcCore(coreApi))
+}
+
+func NewRpcCore(coreApi *CoreApi) *RcpCoreApi {
+	return &RcpCoreApi{
+		core: coreApi,
+	}
+}
+
+type FindLogsRequest struct {
+	Size int
+	Page int
+}
+
+func (r *RcpCoreApi) FindLogs(_ *http.Request, req *FindLogsRequest, res *data.Page[*data.LogData]) error {
+	page, err := r.core.GetFileList(req.Size, req.Page)
+	if err != nil {
+		return err
+	}
+	res.Data = page.Data
+	res.Total = page.Total
+	return nil
 }

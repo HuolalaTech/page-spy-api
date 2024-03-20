@@ -68,6 +68,31 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return nil
 	})
 
+	route.GET("/log/list", func(c echo.Context) error {
+		page := c.QueryParam("page")
+		size := c.QueryParam("size")
+		if page == "" || size == "" {
+			return fmt.Errorf("find logs need page and size")
+		}
+
+		pageNum, err := strconv.Atoi(page)
+		if err != nil {
+			return err
+		}
+
+		sizeNum, err := strconv.Atoi(size)
+		if err != nil {
+			return err
+		}
+
+		logs, err := core.data.FindLogs(sizeNum, pageNum)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(200, common.NewSuccessResponse(logs))
+	})
+
 	route.GET("/log/delete", func(c echo.Context) error {
 		fileId := c.QueryParam("fileId")
 		machine, err := core.GetMachineIdByFileName(fileId)
