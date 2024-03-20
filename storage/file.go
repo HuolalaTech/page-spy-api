@@ -2,7 +2,6 @@ package storage
 
 import (
 	"fmt"
-	"io"
 	"os"
 )
 
@@ -28,7 +27,7 @@ func (f *FileApi) SaveLog(log *LogFile) error {
 	}
 
 	defer dst.Close()
-	if _, err = io.Copy(dst, log.File); err != nil {
+	if _, err = dst.Write(log.File); err != nil {
 		return fmt.Errorf("create log file error: %w", err)
 	}
 
@@ -47,15 +46,15 @@ func (f *FileApi) GetLog(fileId string) (*LogFile, error) {
 		return nil, fmt.Errorf("get file size error: %w", err)
 	}
 
-	file, err := os.Open(logFilePath)
+	fileSteam, err := os.Open(logFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("open log file error: %w", err)
 	}
 
 	return &LogFile{
-		FileId: fileId,
-		Size:   fileInfo.Size(),
-		File:   file,
+		FileId:    fileId,
+		Size:      fileInfo.Size(),
+		FileSteam: fileSteam,
 	}, nil
 }
 

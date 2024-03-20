@@ -97,7 +97,7 @@ func (d *Data) FindTimeoutLogs(before time.Time, size int) ([]*LogData, error) {
 
 func (d *Data) FindOldestLogs(size int) ([]*LogData, error) {
 	var logs []*LogData
-	result := d.db.Limit(size).Order("created_at desc").Find(&logs)
+	result := d.db.Limit(size).Order("created_at asc").Find(&logs)
 	return logs, result.Error
 }
 

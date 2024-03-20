@@ -55,12 +55,12 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 			return err
 		}
 
-		defer file.File.Close()
+		defer file.FileSteam.Close()
 		c.Response().Header().Set("Content-Disposition", "attachment; filename="+file.Name)
 		c.Response().Header().Set("Content-Type", "application/octet-stream")
 		c.Response().Header().Set("Content-Length", strconv.FormatInt(file.Size, 10))
 
-		_, err = io.Copy(c.Response().Writer, file.File)
+		_, err = io.Copy(c.Response().Writer, file.FileSteam)
 		if err != nil {
 			return err
 		}
@@ -123,10 +123,15 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		}
 
 		defer src.Close()
+		fileBs, err := io.ReadAll(src)
+		if err != nil {
+			return fmt.Errorf("read upload file error: %w", err)
+		}
+
 		logFile := &storage.LogFile{
 			Name: file.Filename,
 			Size: file.Size,
-			File: src,
+			File: fileBs,
 		}
 
 		createFile, err := core.CreateFile(logFile)

@@ -11,17 +11,19 @@ import (
 
 	"github.com/HuolalaTech/page-spy-api/config"
 	"github.com/HuolalaTech/page-spy-api/data"
+	"github.com/HuolalaTech/page-spy-api/logger"
 	"github.com/HuolalaTech/page-spy-api/rpc"
 	"github.com/HuolalaTech/page-spy-api/storage"
 	"github.com/HuolalaTech/page-spy-api/task"
-	"github.com/labstack/gommon/log"
 )
+
+var log = logger.Log().WithField("module", "core")
 
 type CoreApi struct {
 	storage        storage.StorageApi
 	data           data.DataApi
-	maxSize        int64 // unit byte
-	maxLife        int64 // unit Hour
+	maxSizeOfByte  int64 // unit byte
+	maxLifeOfHour  int64 // unit Hour
 	addressManager *rpc.AddressManager
 }
 
@@ -58,16 +60,8 @@ func (e *EmptyReaderClose) Close() error {
 }
 
 func (c *CoreApi) CreateFile(file *storage.LogFile) (*storage.LogFile, error) {
-	hash := md5.New()
-	reader := io.TeeReader(file.File, hash)
-
-	file.File = &EmptyReaderClose{
-		reader: reader,
-	}
-
-	md5Sum := hash.Sum(nil)
-	md5String := hex.EncodeToString(md5Sum)
-
+	hash := md5.Sum(file.File)
+	md5String := hex.EncodeToString(hash[:])
 	file.FileId = c.CreateFileId(md5String)
 	err := c.data.CreateLog(&data.LogData{
 		Model: data.Model{
@@ -97,7 +91,21 @@ func (c *CoreApi) GetFileList(size int, page int) (*data.Page[*data.LogData], er
 }
 
 func (c *CoreApi) GetFile(fileId string) (*storage.LogFile, error) {
-	return c.storage.GetLog(fileId)
+	fileData, err := c.data.FindLogByFileId(fileId)
+	if err != nil {
+		return nil, err
+	}
+	if fileData == nil {
+		return nil, fmt.Errorf("file %s not found", fileId)
+	}
+
+	logFile, err := c.storage.GetLog(fileId)
+	if err != nil {
+		return nil, err
+	}
+
+	logFile.Name = fileData.Name
+	return logFile, nil
 }
 
 func (c *CoreApi) DeleteFile(fileId string) error {
@@ -110,7 +118,7 @@ func (c *CoreApi) DeleteFile(fileId string) error {
 }
 
 func (c *CoreApi) CleanFileByTime() error {
-	before := time.Now().Add(-time.Duration(c.maxLife) * time.Hour)
+	before := time.Now().Add(-time.Duration(c.maxLifeOfHour) * time.Hour)
 	logs, err := c.data.FindTimeoutLogs(before, 10)
 	if err != nil {
 		return err
@@ -120,7 +128,7 @@ func (c *CoreApi) CleanFileByTime() error {
 		return nil
 	}
 
-	log.Infof("clean file by time %d file timeout", len(logs))
+	log.Infof("clean file by time %d file timeout before %s", len(logs), before.String())
 	for _, l := range logs {
 		err := c.DeleteFile(l.FileId)
 		if err != nil {
@@ -137,11 +145,12 @@ func (c *CoreApi) CleanFileBySize() error {
 	if err != nil {
 		return err
 	}
-	if size < c.maxSize {
+
+	if size < c.maxSizeOfByte {
 		return nil
 	}
 
-	log.Infof("clean file by size %dmb > max size %dmb", size/(1024*1024), c.maxSize/(1024*1024))
+	log.Infof("clean file by size %dmb > max size %dmb", size/(1024*1024), c.maxSizeOfByte/(1024*1024))
 	logs, err := c.data.FindOldestLogs(10)
 	if err != nil {
 		return err
@@ -171,23 +180,23 @@ func (c *CoreApi) CleanFile() error {
 	return nil
 }
 
-func NewCore(config *config.Config, storage storage.StorageApi, taskManager task.TaskManager, data data.DataApi, addressManager *rpc.AddressManager, rpcManager *rpc.RpcManager) (*CoreApi, error) {
-	maxLogFileSize := config.MaxLogFileSize
-	if config.MaxLogFileSize <= 0 {
-		maxLogFileSize = 10 * 1024 // default log size 10GB
+func NewCore(config *config.Config, storage storage.StorageApi, taskManager *task.TaskManager, data data.DataApi, addressManager *rpc.AddressManager, rpcManager *rpc.RpcManager) (*CoreApi, error) {
+	maxLogFileSizeOfMb := config.MaxLogFileSizeOfMB
+	if config.MaxLogFileSizeOfMB <= 0 {
+		maxLogFileSizeOfMb = 10 * 1024 // default log size 10GB
 	}
 
-	maxLife := config.MaxLogLifeTime
-	if maxLife <= 0 {
-		maxLife = 30 * 24 // default log life 30 day
+	maxLifeOfHour := config.MaxLogLifeTimeOfHour
+	if maxLifeOfHour <= 0 {
+		maxLifeOfHour = 30 * 24 // default log life 30 day
 	}
 
 	coreApi := &CoreApi{
 		storage:        storage,
 		data:           data,
 		addressManager: addressManager,
-		maxSize:        maxLogFileSize * 1024 * 1024,
-		maxLife:        maxLife,
+		maxSizeOfByte:  maxLogFileSizeOfMb * 1024 * 1024,
+		maxLifeOfHour:  maxLifeOfHour,
 	}
 	err := taskManager.AddTask(task.NewTask("clean_file", 1*time.Hour, coreApi.CleanFile))
 	if err != nil {

@@ -7,10 +7,11 @@ import (
 )
 
 type LogFile struct {
-	Name   string        `json:"name"`
-	FileId string        `json:"fileId"`
-	Size   int64         `json:"size"`
-	File   io.ReadCloser `json:"-"`
+	Name      string        `json:"name"`
+	FileId    string        `json:"fileId"`
+	Size      int64         `json:"size"`
+	File      []byte        `json:"-"`
+	FileSteam io.ReadCloser `json:"-"`
 }
 
 type StorageApi interface {
