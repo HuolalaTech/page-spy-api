@@ -22,6 +22,7 @@ import (
 var joinLog = logger.Log().WithField("module", "join")
 
 func writeResponse(w http.ResponseWriter, res *common.Response) {
+	w.Header().Set("Cache-Control", "no-store")
 	if res.Success {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
