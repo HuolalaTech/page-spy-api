@@ -12,10 +12,10 @@ import (
 type Status string
 
 const (
-	Error   Status = "错误"
-	Created Status = "已创建"
-	Saved   Status = "已保存"
-	Unknown Status = "未知"
+	Error   Status = "Error"
+	Created Status = "Created"
+	Saved   Status = "Saved"
+	Unknown Status = "Unknown"
 )
 
 type Page[T OrderData] struct {
