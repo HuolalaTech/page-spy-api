@@ -1,6 +1,7 @@
 package route
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
@@ -20,6 +21,7 @@ import (
 var log = logger.Log().WithField("module", "core")
 
 type CoreApi struct {
+	rpcManager     *rpc.RpcManager
 	storage        storage.StorageApi
 	data           data.DataApi
 	maxSizeOfByte  int64 // unit byte
@@ -86,8 +88,23 @@ func (c *CoreApi) CreateFile(file *storage.LogFile) (*storage.LogFile, error) {
 	return file, c.data.UpdateLogStatus(file.FileId, data.Saved)
 }
 
-func (c *CoreApi) GetFileList(size int, page int) (*data.Page[*data.LogData], error) {
+func (c *CoreApi) getFileList(size int, page int) (*data.Page[*data.LogData], error) {
 	return c.data.FindLogs(size, page)
+}
+
+func (c *CoreApi) GetFileList(size int, page int) (*data.Page[*data.LogData], error) {
+	res := &data.Page[*data.LogData]{}
+	err := rpc.CallAllClient(c.rpcManager, context.Background(), "CoreApi.FindLogs", &FindLogsRequest{
+		Size: size,
+		Page: page,
+	}, res)
+
+	if err != nil {
+		return nil, err
+	}
+
+	res.Desc()
+	return res, nil
 }
 
 func (c *CoreApi) GetFile(fileId string) (*storage.LogFile, error) {
@@ -193,6 +210,7 @@ func NewCore(config *config.Config, storage storage.StorageApi, taskManager *tas
 
 	coreApi := &CoreApi{
 		storage:        storage,
+		rpcManager:     rpcManager,
 		data:           data,
 		addressManager: addressManager,
 		maxSizeOfByte:  maxLogFileSizeOfMb * 1024 * 1024,
@@ -218,7 +236,7 @@ type FindLogsRequest struct {
 }
 
 func (r *RcpCoreApi) FindLogs(_ *http.Request, req *FindLogsRequest, res *data.Page[*data.LogData]) error {
-	page, err := r.core.GetFileList(req.Size, req.Page)
+	page, err := r.core.getFileList(req.Size, req.Page)
 	if err != nil {
 		return err
 	}

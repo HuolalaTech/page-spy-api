@@ -41,6 +41,7 @@ func (d *Data) CreateLog(log *LogData) error {
 	return result.Error
 }
 
+
 func (d *Data) FindLogs(size int, page int) (*Page[*LogData], error) {
 	if size <= 0 {
 		return nil, fmt.Errorf("size should be greater than 0")

@@ -85,7 +85,7 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 			return err
 		}
 
-		logs, err := core.data.FindLogs(sizeNum, pageNum)
+		logs, err := core.GetFileList(sizeNum, pageNum)
 		if err != nil {
 			return err
 		}
