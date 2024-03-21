@@ -1,21 +1,30 @@
 package container
 
 import (
-	"io/fs"
 	"log"
-	"net/http"
 
 	"github.com/HuolalaTech/page-spy-api/config"
-	selfMiddleware "github.com/HuolalaTech/page-spy-api/serve/middleware"
+	"github.com/HuolalaTech/page-spy-api/data"
+	"github.com/HuolalaTech/page-spy-api/proxy"
+	"github.com/HuolalaTech/page-spy-api/rpc"
+	"github.com/HuolalaTech/page-spy-api/serve/route"
 	"github.com/HuolalaTech/page-spy-api/serve/socket"
-	"github.com/HuolalaTech/page-spy-api/static"
-	"github.com/labstack/echo/v4"
+	"github.com/HuolalaTech/page-spy-api/storage"
+	"github.com/HuolalaTech/page-spy-api/task"
 	"go.uber.org/dig"
 )
 
 func initContainer() (*dig.Container, error) {
 	container := dig.New()
 	err := container.Provide(config.LoadConfig)
+	if err != nil {
+		return nil, err
+	}
+	err = container.Provide(rpc.NewAddressManager)
+	if err != nil {
+		return nil, err
+	}
+	err = container.Provide(rpc.NewRpcManager)
 	if err != nil {
 		return nil, err
 	}
@@ -30,50 +39,32 @@ func initContainer() (*dig.Container, error) {
 		return nil, err
 	}
 
-	err = container.Provide(func(socket *socket.WebSocket, config *config.Config, staticConfig *config.StaticConfig) *echo.Echo {
-		e := echo.New()
-		e.Use(selfMiddleware.Logger())
-		e.Use(selfMiddleware.CORS(config))
-		e.HidePort = true
-		e.HideBanner = true
-		route := e.Group("/api/v1")
-		route.GET("/room/list", func(c echo.Context) error {
-			socket.ListRooms(c.Response(), c.Request())
-			return nil
-		})
+	err = container.Provide(data.NewData)
 
-		route.POST("/room/create", func(c echo.Context) error {
-			socket.CreateRoom(c.Response(), c.Request())
-			return nil
-		})
+	if err != nil {
+		return nil, err
+	}
+	err = container.Provide(storage.NewStorage)
 
-		route.GET("/ws/room/join", func(c echo.Context) error {
-			socket.JoinRoom(c.Response(), c.Request())
-			return nil
-		})
+	if err != nil {
+		return nil, err
+	}
 
-		if staticConfig != nil {
-			dist, err := fs.Sub(staticConfig.Files, "dist")
-			if err != nil {
-				// it will never be here
-				panic(err)
-			}
+	err = container.Provide(task.NewTaskManager)
+	if err != nil {
+		return nil, err
+	}
+	err = container.Provide(proxy.NewProxy)
 
-			ff := static.NewFallbackFS(
-				dist,
-				"index.html",
-			)
+	if err != nil {
+		return nil, err
+	}
+	err = container.Provide(route.NewCore)
 
-			e.GET(
-				"/*",
-				echo.WrapHandler(
-					http.FileServer(http.FS(ff))),
-				selfMiddleware.Cache(),
-			)
-		}
-
-		return e
-	})
+	if err != nil {
+		return nil, err
+	}
+	err = container.Provide(route.NewEcho)
 
 	return container, err
 }

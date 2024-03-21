@@ -23,11 +23,14 @@ func NewRpcManager(addressManager *AddressManager) *RpcManager {
 	}
 	server := hRpc.NewServer()
 	server.RegisterCodec(hJson.NewCodec(), "application/json")
-	return &RpcManager{
+	rpcManager := &RpcManager{
 		addressManager: addressManager,
 		rpcList:        rpcList,
 		server:         server,
 	}
+
+	rpcManager.Run()
+	return rpcManager
 }
 
 func (r *RpcManager) GetRpcByAddress(address *event.Address) *RpcClient {
