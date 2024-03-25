@@ -93,7 +93,7 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return c.JSON(200, common.NewSuccessResponse(logs))
 	})
 
-	route.GET("/log/delete", func(c echo.Context) error {
+	route.DELETE("/log/delete", func(c echo.Context) error {
 		fileId := c.QueryParam("fileId")
 		machine, err := core.GetMachineIdByFileName(fileId)
 		if err != nil {
