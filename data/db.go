@@ -80,7 +80,6 @@ func (f *FileListQuery) GetTo() *time.Time {
 }
 
 func (query *FileListQuery) getDB(db *gorm.DB) *gorm.DB {
-	offset := query.GetOffset()
 	q := db
 	if (query.Tags != nil && len(query.Tags) > 0) || query.Keyword != "" {
 		q = q.Joins("join log_tags on log_tags.log_data_id = log_data.id").Joins("join tags on tags.id = log_tags.tag_id")
@@ -92,7 +91,6 @@ func (query *FileListQuery) getDB(db *gorm.DB) *gorm.DB {
 		q = q.Where("tags.value like ?", keyword)
 	}
 
-	q = q.Preload("Tags").Offset(offset).Limit(query.Size).Order("log_data.created_at desc")
 	from := query.GetFrom()
 	if from != nil {
 		q = q.Where("log_data.created_at > ?", from)
@@ -103,7 +101,7 @@ func (query *FileListQuery) getDB(db *gorm.DB) *gorm.DB {
 		q = q.Where("log_data.created_at < ?", to)
 	}
 
-	return q.Offset(offset).Limit(query.Size).Order("log_data.created_at desc")
+	return q.Preload("Tags").Order("log_data.created_at desc")
 }
 
 func (d *Data) FindLogs(query *FileListQuery) (*Page[*LogData], error) {
@@ -116,7 +114,8 @@ func (d *Data) FindLogs(query *FileListQuery) (*Page[*LogData], error) {
 	}
 
 	var logs []*LogData
-	result := query.getDB(d.db).Find(&logs)
+	offset := query.GetOffset()
+	result := query.getDB(d.db).Offset(offset).Limit(query.Size).Find(&logs)
 	if result.Error != nil {
 		return nil, result.Error
 	}
