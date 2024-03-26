@@ -5,9 +5,12 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/HuolalaTech/page-spy-api/config"
+	"github.com/HuolalaTech/page-spy-api/data"
 	"github.com/HuolalaTech/page-spy-api/proxy"
 	"github.com/HuolalaTech/page-spy-api/serve/common"
 	selfMiddleware "github.com/HuolalaTech/page-spy-api/serve/middleware"
@@ -16,6 +19,31 @@ import (
 	"github.com/HuolalaTech/page-spy-api/storage"
 	"github.com/labstack/echo/v4"
 )
+
+var TagName = []string{"project", "title", "deviceId", "userAgent"}
+
+func include(arr []string, value string) bool {
+	for _, v := range arr {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}
+
+func getTags(params url.Values) []*data.Tag {
+	tags := []*data.Tag{}
+	for k, v := range params {
+		if include(TagName, k) {
+			tags = append(tags, &data.Tag{
+				Key:   k,
+				Value: strings.Join(v, " "),
+			})
+		}
+	}
+
+	return tags
+}
 
 func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, proxyManager *proxy.ProxyManager, staticConfig *config.StaticConfig) *echo.Echo {
 	e := echo.New()
@@ -85,7 +113,37 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 			return err
 		}
 
-		logs, err := core.GetFileList(sizeNum, pageNum)
+		keyWord := c.QueryParam("keyWord")
+		query := &data.FileListQuery{
+			PageQuery: data.PageQuery{
+				Size: sizeNum,
+				Page: pageNum,
+			},
+			Tags:    getTags(c.QueryParams()),
+			Keyword: keyWord,
+		}
+
+		fromString := c.QueryParam("from")
+		if fromString != "" {
+			fromStringUnix, err := strconv.ParseInt(fromString, 10, 64)
+			if err != nil {
+				return fmt.Errorf("from time format error %w", err)
+			}
+			query.From = &fromStringUnix
+		}
+
+		toString := c.QueryParam("to")
+
+		if toString != "" {
+			toStringUnix, err := strconv.ParseInt(toString, 10, 64)
+			if err != nil {
+				return fmt.Errorf("to time format error %w", err)
+			}
+
+			query.To = &toStringUnix
+		}
+
+		logs, err := core.GetFileList(query)
 		if err != nil {
 			return err
 		}
@@ -129,6 +187,7 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		}
 
 		logFile := &storage.LogFile{
+			Tags: getTags(c.QueryParams()),
 			Name: file.Filename,
 			Size: file.Size,
 			File: fileBs,

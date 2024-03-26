@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/HuolalaTech/page-spy-api/data"
 )
 
 type LogFile struct {
 	Name      string        `json:"name"`
 	FileId    string        `json:"fileId"`
 	Size      int64         `json:"size"`
+	Tags      []*data.Tag   `json:"tags"`
 	File      []byte        `json:"-"`
 	FileSteam io.ReadCloser `json:"-"`
 }

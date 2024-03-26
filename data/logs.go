@@ -60,6 +60,7 @@ type LogData struct {
 	Status Status `json:"status"`
 	Size   int64  `json:"size"`
 	FileId string `gorm:"index:unique" json:"fileId"`
+	Tags   []*Tag `gorm:"many2many:log_tags;" json:"tags"`
 	Name   string `json:"name"`
 }
 

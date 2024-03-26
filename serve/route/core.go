@@ -70,6 +70,7 @@ func (c *CoreApi) CreateFile(file *storage.LogFile) (*storage.LogFile, error) {
 			UpdatedAt: time.Now(),
 			CreatedAt: time.Now(),
 		},
+		Tags:   file.Tags,
 		FileId: file.FileId,
 		Status: data.Created,
 		Size:   file.Size,
@@ -88,16 +89,13 @@ func (c *CoreApi) CreateFile(file *storage.LogFile) (*storage.LogFile, error) {
 	return file, c.data.UpdateLogStatus(file.FileId, data.Saved)
 }
 
-func (c *CoreApi) getFileList(size int, page int) (*data.Page[*data.LogData], error) {
-	return c.data.FindLogs(size, page)
+func (c *CoreApi) getFileList(query *data.FileListQuery) (*data.Page[*data.LogData], error) {
+	return c.data.FindLogs(query)
 }
 
-func (c *CoreApi) GetFileList(size int, page int) (*data.Page[*data.LogData], error) {
+func (c *CoreApi) GetFileList(query *data.FileListQuery) (*data.Page[*data.LogData], error) {
 	res := &data.Page[*data.LogData]{}
-	err := rpc.CallAllClient(c.rpcManager, context.Background(), "CoreApi.FindLogs", &FindLogsRequest{
-		Size: size,
-		Page: page,
-	}, res)
+	err := rpc.CallAllClient(c.rpcManager, context.Background(), "CoreApi.FindLogs", query, res)
 
 	if err != nil {
 		return nil, err
@@ -230,13 +228,8 @@ func NewRpcCore(coreApi *CoreApi) *RcpCoreApi {
 	}
 }
 
-type FindLogsRequest struct {
-	Size int
-	Page int
-}
-
-func (r *RcpCoreApi) FindLogs(_ *http.Request, req *FindLogsRequest, res *data.Page[*data.LogData]) error {
-	page, err := r.core.getFileList(req.Size, req.Page)
+func (r *RcpCoreApi) FindLogs(_ *http.Request, req *data.FileListQuery, res *data.Page[*data.LogData]) error {
+	page, err := r.core.getFileList(req)
 	if err != nil {
 		return err
 	}
