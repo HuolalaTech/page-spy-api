@@ -150,6 +150,10 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 	})
 
 	route.DELETE("/log/delete", func(c echo.Context) error {
+		if !config.EnableDeleteLog {
+			return fmt.Errorf("not allowed delete log")
+		}
+
 		fileId := c.QueryParam("fileId")
 		machine, err := core.GetMachineIdByFileName(fileId)
 		if err != nil {
