@@ -12,11 +12,11 @@ type CorsConfig struct {
 }
 
 type Config struct {
-	Port            string      `json:"port"`
-	Debug           bool        `json:"debug"`
-	EnableDeleteLog bool        `json:"enableDeleteLog"`
-	RpcAddress      []*Address  `json:"rpcAddress"`
-	CorsConfig      *CorsConfig `json:"corsConfig"`
+	Port                string      `json:"port"`
+	Debug               bool        `json:"debug"`
+	NotAllowedDeleteLog bool        `json:"notAllowedDeleteLog"`
+	RpcAddress          []*Address  `json:"rpcAddress"`
+	CorsConfig          *CorsConfig `json:"corsConfig"`
 	// max log file size, unit is mb
 	MaxLogFileSizeOfMB int64 `json:"maxLogFileSizeOfMB"`
 	// max log file size, unit is day
