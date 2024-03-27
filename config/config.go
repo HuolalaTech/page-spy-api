@@ -13,6 +13,7 @@ type CorsConfig struct {
 
 type Config struct {
 	Port       string      `json:"port"`
+	Debug      bool        `json:"debug"`
 	RpcAddress []*Address  `json:"rpcAddress"`
 	CorsConfig *CorsConfig `json:"corsConfig"`
 	// max log file size, unit is mb

@@ -3,18 +3,36 @@ package data
 import (
 	"errors"
 	"fmt"
+	"log"
+	"os"
 	"time"
 
+	"github.com/HuolalaTech/page-spy-api/config"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type Data struct {
 	db *gorm.DB
 }
 
-func NewData() (DataApi, error) {
-	db, err := gorm.Open(sqlite.Open("data.db"), &gorm.Config{})
+func NewData(config *config.Config) (DataApi, error) {
+	c := &gorm.Config{}
+	if config.Debug {
+		c.Logger = logger.New(
+			log.New(os.Stdout, "\r\n", log.LstdFlags),
+			logger.Config{
+				SlowThreshold:             time.Second,
+				LogLevel:                  logger.Info,
+				IgnoreRecordNotFoundError: true,
+				ParameterizedQueries:      false,
+				Colorful:                  false,
+			},
+		)
+	}
+
+	db, err := gorm.Open(sqlite.Open("data.db"), c)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect database")
@@ -82,11 +100,12 @@ func (query *FileListQuery) getDB(db *gorm.DB) *gorm.DB {
 	q := db
 
 	if query.Tags != nil && len(query.Tags) > 0 {
-		q = q.Joins("join log_tags on log_tags.log_data_id = log_data.id").Joins("join tags on tags.id = log_tags.tag_id")
-		for _, tag := range query.Tags {
-			q = q.Where("tags.key = ? and tags.value like ?", tag.Key, "%"+tag.Value+"%")
+		for i, tag := range query.Tags {
+			logTagName := fmt.Sprintf("log_tag%d", i)
+			tagName := fmt.Sprintf("tag%d", i)
+			q = q.Joins(fmt.Sprintf("join log_tags as %s on %s.log_data_id = log_data.id", logTagName, logTagName)).
+				Joins(fmt.Sprintf("join tags as %s on %s.id = %s.tag_id and %s.key = ? and %s.value like ?", tagName, tagName, logTagName, tagName, tagName), tag.Key, "%"+tag.Value+"%")
 		}
-
 	}
 
 	from := query.GetFrom()
