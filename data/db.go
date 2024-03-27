@@ -53,10 +53,9 @@ func (p *PageQuery) GetOffset() int {
 
 type FileListQuery struct {
 	PageQuery
-	From    *int64
-	To      *int64
-	Tags    []*Tag
-	Keyword string
+	From *int64
+	To   *int64
+	Tags []*Tag
 }
 
 func (f *FileListQuery) GetFrom() *time.Time {
@@ -81,14 +80,13 @@ func (f *FileListQuery) GetTo() *time.Time {
 
 func (query *FileListQuery) getDB(db *gorm.DB) *gorm.DB {
 	q := db
-	if (query.Tags != nil && len(query.Tags) > 0) || query.Keyword != "" {
+
+	if query.Tags != nil && len(query.Tags) > 0 {
 		q = q.Joins("join log_tags on log_tags.log_data_id = log_data.id").Joins("join tags on tags.id = log_tags.tag_id")
 		for _, tag := range query.Tags {
-			q = q.Where("tags.key = ? and tags.value = ?", tag.Key, tag.Value)
+			q = q.Where("tags.key = ? and tags.value like ?", tag.Key, "%"+tag.Value+"%")
 		}
 
-		keyword := "%" + query.Keyword + "%"
-		q = q.Where("tags.value like ?", keyword)
 	}
 
 	from := query.GetFrom()

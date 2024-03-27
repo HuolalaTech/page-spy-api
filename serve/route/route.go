@@ -113,14 +113,12 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 			return err
 		}
 
-		keyWord := c.QueryParam("keyWord")
 		query := &data.FileListQuery{
 			PageQuery: data.PageQuery{
 				Size: sizeNum,
 				Page: pageNum,
 			},
-			Tags:    getTags(c.QueryParams()),
-			Keyword: keyWord,
+			Tags: getTags(c.QueryParams()),
 		}
 
 		fromString := c.QueryParam("from")
