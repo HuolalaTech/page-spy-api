@@ -17,10 +17,19 @@ type Config struct {
 	NotAllowedDeleteLog bool        `json:"notAllowedDeleteLog"`
 	RpcAddress          []*Address  `json:"rpcAddress"`
 	CorsConfig          *CorsConfig `json:"corsConfig"`
+	MaxRoomNumber       int         `json:"maxRoomNumber"`
 	// max log file size, unit is mb
 	MaxLogFileSizeOfMB int64 `json:"maxLogFileSizeOfMB"`
 	// max log file size, unit is day
 	MaxLogLifeTimeOfHour int64 `json:"maxLogLifeTimeOfHour"`
+}
+
+func (c *Config) GetMaxRoomNumber() int {
+	if c.MaxRoomNumber <= 0 {
+		return 500
+	}
+
+	return c.MaxRoomNumber
 }
 
 type Address struct {

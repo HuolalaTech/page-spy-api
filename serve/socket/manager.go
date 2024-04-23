@@ -9,9 +9,9 @@ import (
 	"github.com/HuolalaTech/page-spy-api/util"
 )
 
-func NewManager(config *config.Config,rpcManager *rpc.RpcManager , addressManager *rpc.AddressManager) (*room.RemoteRpcRoomManager, error) {
+func NewManager(config *config.Config, rpcManager *rpc.RpcManager, addressManager *rpc.AddressManager) (*room.RemoteRpcRoomManager, error) {
 	localEvent := event.NewLocalEventEmitter(addressManager, rpcManager)
-	localRoomManager := room.NewLocalRoomManager(localEvent, addressManager, 200)
+	localRoomManager := room.NewLocalRoomManager(localEvent, addressManager, int64(config.MaxRoomNumber))
 	localRoomManager.Start()
 	_, err := event.NewRpcEventEmitter(localEvent, rpcManager)
 	if err != nil {
