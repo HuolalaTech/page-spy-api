@@ -121,6 +121,7 @@ func readClientMessage(ctx context.Context, socket *socket, room roomApi.RemoteR
 		socket.writeWebsocketError(roomApi.NewClientError("message type %s is not supported to be sent by frontend", msg.Type))
 		return nil
 	}
+
 	log.Debugf("socket received %s", msg.Type)
 	err = room.SendMessage(ctx, msg)
 	if err != nil {

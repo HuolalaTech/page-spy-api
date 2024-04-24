@@ -20,7 +20,7 @@ func NewRemoteRoom(connection *room.Connection, opt *room.Info, eventEmitter eve
 		log:          log.WithField("remote_room", connection.Address.ID).WithField("local_room", opt.Address.ID),
 		eventEmitter: eventEmitter,
 		rpcRoom:      rpcRoom,
-		messages:     make(chan *room.Message, 20),
+		messages:     make(chan *room.Message, 2000),
 		createdAt:    time.Now(),
 		activeAt:     time.Now(),
 	}
@@ -156,6 +156,14 @@ func (r *remoteRoom) Listen(ctx context.Context, msg *event.Package) {
 		return
 	}
 
+	start := time.Now()
+	status := "success"
+	defer func() {
+		metric.Time("page_spy_remote_room_emit", map[string]string{
+			"status": status,
+		}, float64(time.Since(start).Milliseconds()))
+	}()
+
 	select {
 	case r.messages <- roomMsg:
 		if roomMsg.Type == room.CloseType {
@@ -165,6 +173,7 @@ func (r *remoteRoom) Listen(ctx context.Context, msg *event.Package) {
 
 		return
 	case <-ctx.Done():
+		status = "timeout"
 		r.log.Errorf("consume message %s timeout", msg.Content)
 		return
 	}

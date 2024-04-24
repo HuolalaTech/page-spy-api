@@ -23,7 +23,7 @@ func NewLocalRoom(opt *room.Info, event event.EventEmitter, addressManager *rpc.
 		log:       logger,
 		Info:      opt,
 		event:     event,
-		messages:  make(chan *room.Message, 10),
+		messages:  make(chan *room.Message, 2000),
 	}
 }
 
@@ -333,11 +333,19 @@ func (r *localRoom) Listen(ctx context.Context, pkg *event.Package) {
 		r.log.WithError(err).Error("listen message failed")
 		return
 	}
+	start := time.Now()
+	status := "success"
+	defer func() {
+		metric.Time("page_spy_local_room_emit", map[string]string{
+			"status": status,
+		}, float64(time.Since(start).Milliseconds()))
+	}()
 
 	select {
 	case r.messages <- roomMsg:
 		return
 	case <-ctx.Done():
+		status = "timeout"
 		r.log.Errorf("listen message %s timeout", pkg.Content)
 		return
 	}
