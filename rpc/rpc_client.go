@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/HuolalaTech/page-spy-api/api/room"
+	"github.com/HuolalaTech/page-spy-api/metric"
 	"github.com/HuolalaTech/page-spy-api/state"
 	req "github.com/imroc/req/v2"
 )
@@ -117,7 +118,19 @@ func (r *RpcClient) call(ctx context.Context, serviceMethod string, args interfa
 }
 
 func (r *RpcClient) Call(ctx context.Context, serviceMethod string, args interface{}, reply interface{}) error {
+	start := time.Now()
+	status := "success"
+	defer func() {
+		metric.Time("page_spy_rpc_call", map[string]string{
+			"status": status,
+		}, float64(time.Since(start).Milliseconds()))
+	}()
+
 	err := r.call(ctx, serviceMethod, args, reply)
+	if err != nil {
+		status = "error"
+	}
+
 	log.Debugf("rpc call %s method %s", r.address, serviceMethod)
 	return err
 }

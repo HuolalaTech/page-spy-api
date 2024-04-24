@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"runtime/debug"
 	"sync"
+	"time"
 
 	eventApi "github.com/HuolalaTech/page-spy-api/api/event"
 	roomApi "github.com/HuolalaTech/page-spy-api/api/room"
@@ -16,6 +17,7 @@ import (
 	"github.com/HuolalaTech/page-spy-api/metric"
 	"github.com/HuolalaTech/page-spy-api/room"
 	"github.com/HuolalaTech/page-spy-api/serve/common"
+	"github.com/HuolalaTech/page-spy-api/util"
 	"github.com/gorilla/websocket"
 )
 
@@ -123,6 +125,7 @@ func readClientMessage(ctx context.Context, socket *socket, room roomApi.RemoteR
 	}
 
 	log.Debugf("socket received %s", msg.Type)
+	metric.Count("server_read_message", map[string]string{}, 1)
 	err = room.SendMessage(ctx, msg)
 	if err != nil {
 		socket.writeWebsocketError(err)
@@ -139,6 +142,8 @@ func readClientMessage(ctx context.Context, socket *socket, room roomApi.RemoteR
 func onRoomMessage(ctx context.Context, socket *socket, room roomApi.RemoteRoom) error {
 	select {
 	case msg := <-room.OnMessage():
+		now := util.TimeToNumber(time.Now())
+		metric.Time("server_send_message", map[string]string{}, float64(now-msg.CreatedAt))
 		socket.WriteDataIgnoreError(msg)
 	case <-room.Done():
 		return roomApi.NewRoomCloseError("room %s left", room.GetRoomAddress().ID)
