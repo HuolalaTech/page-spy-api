@@ -8,23 +8,47 @@ import (
 	"time"
 
 	"github.com/HuolalaTech/page-spy-api/config"
+	selfLogger "github.com/HuolalaTech/page-spy-api/logger"
+	"github.com/HuolalaTech/page-spy-api/util"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	gormLogger "gorm.io/gorm/logger"
 )
 
 type Data struct {
 	db *gorm.DB
 }
 
+func initDataFilePath() (string, error) {
+	fileInfo, err := os.Stat("data")
+	if (err != nil && os.IsNotExist(err)) || (err == nil && !fileInfo.IsDir()) {
+		err := os.Mkdir("data", 0755)
+		if err != nil {
+			return "", fmt.Errorf("failed to create data directory")
+		}
+	}
+
+	if util.FileExists("data.db") {
+		return "data.db", nil
+	}
+
+	if util.FileExists("data/data.db") {
+		return "data/data.db", nil
+	}
+
+	return "data/data.db", nil
+}
+
+var logger = selfLogger.Log().WithField("module", "database")
+
 func NewData(config *config.Config) (DataApi, error) {
 	c := &gorm.Config{}
 	if config.Debug {
-		c.Logger = logger.New(
+		c.Logger = gormLogger.New(
 			log.New(os.Stdout, "\r\n", log.LstdFlags),
-			logger.Config{
+			gormLogger.Config{
 				SlowThreshold:             time.Second,
-				LogLevel:                  logger.Info,
+				LogLevel:                  gormLogger.Info,
 				IgnoreRecordNotFoundError: true,
 				ParameterizedQueries:      false,
 				Colorful:                  false,
@@ -32,7 +56,13 @@ func NewData(config *config.Config) (DataApi, error) {
 		)
 	}
 
-	db, err := gorm.Open(sqlite.Open("data.db"), c)
+	dataPath, err := initDataFilePath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to init data path")
+	}
+
+	logger.Infof("init database with file %s", dataPath)
+	db, err := gorm.Open(sqlite.Open(dataPath), c)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect database")

@@ -2,6 +2,7 @@ bin/dist
 bin/config.json
 bin/__debug_bin
 bin/data.db
+bin/data
 bin_back
 log
 .vscode
