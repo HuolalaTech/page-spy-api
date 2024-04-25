@@ -246,13 +246,13 @@ type Info struct {
 	Connections []*Connection     `json:"connections"`
 }
 
-func NewRoomInfo(name string, password string, group string, address *event.Address) *Info {
+func NewRoomInfo(name string, password string, tags map[string]string, group string, address *event.Address) *Info {
 	return &Info{
 		Name:        name,
 		Address:     address,
 		Password:    password,
 		Group:       group,
-		Tags:        map[string]string{},
+		Tags:        tags,
 		Connections: make([]*Connection, 0),
 		CreatedAt:   time.Now(),
 		ActiveAt:    time.Now(),

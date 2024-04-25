@@ -21,7 +21,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var joinLog = logger.Log().WithField("module", "join")
+var joinLog = logger.Log().WithField("module", "socket")
 
 func writeResponse(w http.ResponseWriter, res *common.Response) {
 	if res.Success {
@@ -297,8 +297,7 @@ func (s *WebSocket) CreateRoom(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	opt := roomApi.NewRoomInfo(name, address.ID, group, address)
-	opt.Tags = tags
+	opt := roomApi.NewRoomInfo(name, address.ID, tags, group, address)
 	_, err := s.roomManager.CreateLocalRoom(r.Context(), opt)
 	if err != nil {
 		writeResponse(rw, common.NewErrorResponse(err))
