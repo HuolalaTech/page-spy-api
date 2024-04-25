@@ -18,6 +18,8 @@ func NewLocalRoom(opt *room.Info, event event.EventEmitter, addressManager *rpc.
 	logger := log.WithField("room", opt.Address.ID)
 	logger.Infof("local room created")
 	opt.Connections = make([]*room.Connection, 0)
+	opt.CreatedAt = time.Now()
+	opt.ActiveAt = time.Now()
 	return &localRoom{
 		basicRoom: newBasicRoom(),
 		log:       logger,

@@ -355,16 +355,9 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 		roomName := r.URL.Query().Get("room.name")
 		roomGroup := r.URL.Query().Get("room.group")
 
-		opt := &roomApi.Info{
-			Name:     roomName,
-			Group:    roomGroup,
-			Tags:     roomTags,
-			Address:  address,
-			Password: address.ID,
-		}
+		opt := roomApi.NewRoomInfo(roomName, address.ID, roomTags, roomGroup, address)
 		room, err = s.roomManager.ForceJoinRoom(r.Context(), connection, joinOpt, opt)
 	} else {
-
 		room, err = s.roomManager.JoinRoom(r.Context(), connection, joinOpt)
 	}
 
