@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 
@@ -258,7 +259,7 @@ type ListRoomParams struct {
 }
 
 func (s *WebSocket) ListRooms(rw http.ResponseWriter, r *http.Request) {
-	tags := getTags(r.URL.Query())
+	tags := getTags(r.URL.Query(), "")
 	rooms, err := s.roomManager.ListRooms(r.Context(), tags)
 	if err != nil {
 		writeResponse(rw, common.NewErrorResponse(err))
@@ -275,12 +276,19 @@ type CreateRoomParams struct {
 	Tags     map[string]string `json:"tags"`
 }
 
-func getTags(query url.Values) map[string]string {
+func getTags(query url.Values, prefix string) map[string]string {
 	tags := make(map[string]string, len(query))
 	for k, v := range query {
 		if len(v) > 0 {
 			value := v[0]
-			tags[k] = value
+			if prefix != "" {
+				if strings.HasPrefix(value, prefix) {
+					tags[k] = value[len(prefix):]
+				}
+
+			} else {
+				tags[k] = value
+			}
 		}
 	}
 
@@ -291,7 +299,7 @@ func (s *WebSocket) CreateRoom(rw http.ResponseWriter, r *http.Request) {
 	address := s.roomManager.AddressManager.GeneratorRoomAddress()
 	name := r.URL.Query().Get("name")
 	group := r.URL.Query().Get("group")
-	tags := getTags(r.URL.Query())
+	tags := getTags(r.URL.Query(), "")
 	if name == "" || group == "" {
 		writeResponse(rw, common.NewErrorResponse(errors.New("name or group missing")))
 		return
@@ -323,7 +331,6 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 
 	id := r.URL.Query().Get("address")
 	group := r.URL.Query().Get("group")
-	tags := getTags(r.URL.Query())
 	name := r.URL.Query().Get("name")
 	userId := r.URL.Query().Get("userId")
 	forceCreate := r.URL.Query().Get("forceCreate")
@@ -337,18 +344,27 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 	connection := s.roomManager.CreateConnection()
 	connection.Name = name
 	connection.UserID = userId
-	opt := &roomApi.Info{
-		Name:     name,
-		Group:    group,
-		Tags:     tags,
-		Address:  address,
-		Password: address.ID,
-	}
 
 	var room roomApi.RemoteRoom
 	if forceCreate == "true" {
+		roomTags := getTags(r.URL.Query(), "room.")
+		roomName := r.URL.Query().Get("room.name")
+		roomGroup := r.URL.Query().Get("room.group")
+
+		opt := &roomApi.Info{
+			Name:     roomName,
+			Group:    roomGroup,
+			Tags:     roomTags,
+			Address:  address,
+			Password: address.ID,
+		}
 		room, err = s.roomManager.ForceJoinRoom(r.Context(), connection, opt)
 	} else {
+		opt := &roomApi.Info{
+			Group:    group,
+			Address:  address,
+			Password: address.ID,
+		}
 		room, err = s.roomManager.JoinRoom(r.Context(), connection, opt)
 	}
 
