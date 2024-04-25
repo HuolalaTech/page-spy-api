@@ -228,7 +228,7 @@ func (r *RemoteRpcRoomManager) CreateAndJoinRoom(ctx context.Context, connection
 	return remoteRoom, nil
 }
 
-func (r *RemoteRpcRoomManager) ForceJoinRoom(ctx context.Context, connection *room.Connection, opt *room.Info) (room.RemoteRoom, error) {
+func (r *RemoteRpcRoomManager) ForceJoinRoom(ctx context.Context, connection *room.Connection, opt *room.Info, roomOpt *room.Info) (room.RemoteRoom, error) {
 	rm, err := r.JoinRoom(ctx, connection, opt)
 	if err != nil {
 		re, ok := err.(*room.Error)
@@ -236,7 +236,7 @@ func (r *RemoteRpcRoomManager) ForceJoinRoom(ctx context.Context, connection *ro
 			return nil, err
 		}
 
-		_, err = r.CreateRoom(ctx, room.NewRoomInfo(opt.Name, opt.Password, opt.Tags, opt.Group, opt.Address))
+		_, err = r.CreateRoom(ctx, roomOpt)
 		if err != nil {
 			return nil, err
 		}

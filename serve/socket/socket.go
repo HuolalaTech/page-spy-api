@@ -282,8 +282,8 @@ func getTags(query url.Values, prefix string) map[string]string {
 		if len(v) > 0 {
 			value := v[0]
 			if prefix != "" {
-				if strings.HasPrefix(value, prefix) {
-					tags[k] = value[len(prefix):]
+				if strings.HasPrefix(k, prefix) {
+					tags[k[len(prefix):]] = value
 				}
 
 			} else {
@@ -362,7 +362,7 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 			Address:  address,
 			Password: address.ID,
 		}
-		room, err = s.roomManager.ForceJoinRoom(r.Context(), connection, opt)
+		room, err = s.roomManager.ForceJoinRoom(r.Context(), connection, joinOpt, opt)
 	} else {
 
 		room, err = s.roomManager.JoinRoom(r.Context(), connection, joinOpt)
