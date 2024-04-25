@@ -344,7 +344,11 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 	connection := s.roomManager.CreateConnection()
 	connection.Name = name
 	connection.UserID = userId
-
+	joinOpt := &roomApi.Info{
+		Group:    group,
+		Address:  address,
+		Password: address.ID,
+	}
 	var room roomApi.RemoteRoom
 	if forceCreate == "true" {
 		roomTags := getTags(r.URL.Query(), "room.")
@@ -360,12 +364,8 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 		}
 		room, err = s.roomManager.ForceJoinRoom(r.Context(), connection, opt)
 	} else {
-		opt := &roomApi.Info{
-			Group:    group,
-			Address:  address,
-			Password: address.ID,
-		}
-		room, err = s.roomManager.JoinRoom(r.Context(), connection, opt)
+
+		room, err = s.roomManager.JoinRoom(r.Context(), connection, joinOpt)
 	}
 
 	if err != nil {
@@ -373,7 +373,7 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, err := s.roomManager.GetRoomUsers(r.Context(), opt)
+	users, err := s.roomManager.GetRoomUsers(r.Context(), joinOpt)
 	if err != nil {
 		socket.writeWebsocketError(fmt.Errorf("get room user list failed, %w", err))
 		return
@@ -390,5 +390,5 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 		joinLog.WithError(err).Error("send connect message error")
 	}
 
-	s.serveRoom(opt, connection, socket, room)
+	s.serveRoom(joinOpt, connection, socket, room)
 }
