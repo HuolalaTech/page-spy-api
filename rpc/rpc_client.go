@@ -129,6 +129,7 @@ func (r *RpcClient) Call(ctx context.Context, serviceMethod string, args interfa
 	err := r.call(ctx, serviceMethod, args, reply)
 	if err != nil {
 		status = "error"
+		log.Errorf("rpc_call_error %s method %s error %s", r.address, serviceMethod, err)
 	}
 
 	log.Debugf("rpc call %s method %s", r.address, serviceMethod)

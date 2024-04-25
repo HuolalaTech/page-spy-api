@@ -125,7 +125,9 @@ func readClientMessage(ctx context.Context, socket *socket, room roomApi.RemoteR
 	}
 
 	log.Debugf("socket received %s", msg.Type)
-	metric.Count("server_read_message", map[string]string{}, 1)
+	metric.Count("server_read_message", map[string]string{
+		"type": msg.Type,
+	}, 1)
 	err = room.SendMessage(ctx, msg)
 	if err != nil {
 		socket.writeWebsocketError(err)
@@ -143,7 +145,9 @@ func onRoomMessage(ctx context.Context, socket *socket, room roomApi.RemoteRoom)
 	select {
 	case msg := <-room.OnMessage():
 		now := util.TimeToNumber(time.Now())
-		metric.Time("server_send_message", map[string]string{}, float64(now-msg.CreatedAt))
+		metric.Time("server_send_message", map[string]string{
+			"type": msg.Type,
+		}, float64(now-msg.CreatedAt))
 		socket.WriteDataIgnoreError(msg)
 	case <-room.Done():
 		return roomApi.NewRoomCloseError("room %s left", room.GetRoomAddress().ID)
@@ -320,6 +324,7 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 
 	id := r.URL.Query().Get("address")
 	group := r.URL.Query().Get("group")
+	tags := getTags(r.URL.Query())
 	name := r.URL.Query().Get("name")
 	userId := r.URL.Query().Get("userId")
 	forceCreate := r.URL.Query().Get("forceCreate")
@@ -334,9 +339,11 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 	connection.Name = name
 	connection.UserID = userId
 	opt := &roomApi.Info{
+		Name:     name,
+		Group:    group,
+		Tags:     tags,
 		Address:  address,
 		Password: address.ID,
-		Group:    group,
 	}
 
 	var room roomApi.RemoteRoom

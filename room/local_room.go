@@ -68,13 +68,9 @@ func (r *localRoom) Start(ctx context.Context) error {
 		for {
 			select {
 			case msg := <-r.OnMessage():
-				if msg.Type == room.PingType {
-					r.Ping()
-				} else {
-					err := r.SendMessage(context.Background(), msg)
-					if err != nil {
-						r.log.WithError(err).Errorf("local room broadcast messages failed, %s", err)
-					}
+				err := r.SendMessage(context.Background(), msg)
+				if err != nil {
+					r.log.WithError(err).Errorf("local room broadcast messages failed, %s", err)
 				}
 			case <-r.Done():
 				return
@@ -171,7 +167,7 @@ func (r *localRoom) otherMessage(ctx context.Context, msg *room.Message) error {
 	for _, c := range connections {
 		e := r.event.Emit(ctx, c.Address, eventMsg)
 		if e != nil {
-			r.log.WithError(e).Errorf("emit connection %s message failed, %s", c.Address.ID, e)
+			r.log.WithError(e).Errorf("emit connection %s message failed", c.Address.ID)
 			err = e
 		}
 	}
@@ -241,10 +237,6 @@ func (r *localRoom) SendMessage(ctx context.Context, msg *room.Message) error {
 	}
 
 	r.Info.ActiveAt = time.Now()
-	if msg.Type == room.PingType {
-		return r.pingMessage(ctx)
-	}
-
 	switch msg.Type {
 	case room.MessageType:
 		return r.messageMessage(ctx, msg)
