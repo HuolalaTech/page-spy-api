@@ -24,6 +24,22 @@ type Config struct {
 	MaxLogLifeTimeOfHour int64 `json:"maxLogLifeTimeOfHour"`
 }
 
+func (c *Config) GetMaxLogLifeTimeOfHour() int64 {
+	if c.MaxLogLifeTimeOfHour <= 0 {
+		return 30 * 24 // default log life 30 day
+	}
+
+	return c.MaxLogLifeTimeOfHour
+}
+
+func (c *Config) GetMaxLogFileSizeOfMB() int64 {
+	if c.MaxLogFileSizeOfMB <= 0 {
+		return 10 * 1024 // default log size 10GB
+	}
+
+	return c.MaxLogFileSizeOfMB
+}
+
 func (c *Config) GetMaxRoomNumber() int {
 	if c.MaxRoomNumber <= 0 {
 		return 500
