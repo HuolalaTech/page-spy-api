@@ -132,14 +132,14 @@ func (s *WebSocket) readClientMessage(ctx context.Context, socket *socket, room 
 	}, 1)
 	switch msg.Type {
 	case roomApi.UpdateRoomInfoType:
-		updateRoomInfoContent := msg.Content.(*roomApi.Info)
-		if updateRoomInfoContent == nil {
+		updateRoomInfoContent := msg.Content.(*roomApi.UpdateRoomInfoContent)
+		if updateRoomInfoContent.Info == nil {
 			socket.writeWebsocketError(fmt.Errorf("update room info content info is nil"))
 			return nil
 		}
-		updateRoomInfoContent.Address = room.GetRoomAddress()
-		info, err := s.roomManager.UpdateRoomOption(ctx, updateRoomInfoContent)
-		updateRoomInfoContent = info
+		updateRoomInfoContent.Info.Address = room.GetRoomAddress()
+		info, err := s.roomManager.UpdateRoomOption(ctx, updateRoomInfoContent.Info)
+		updateRoomInfoContent.Info = info
 		if err != nil {
 			socket.writeWebsocketError(err)
 			return nil
