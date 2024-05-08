@@ -111,7 +111,7 @@ func NewMessageContent(messageType string) interface{} {
 	case PingType:
 		return &PingContent{}
 	case UpdateRoomInfoType:
-		return &UpdateRoomInfoContent{}
+		return &Info{}
 	case CloseType, StartType:
 		return &StartOrCloseMessageContent{}
 	case ErrorType:
@@ -123,10 +123,6 @@ func NewMessageContent(messageType string) interface{} {
 	}
 
 	return &unknownContent
-}
-
-type UpdateRoomInfoContent struct {
-	Info *Info `json:"info"`
 }
 
 type PingContent struct {

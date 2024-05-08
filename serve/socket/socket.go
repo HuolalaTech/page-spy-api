@@ -132,14 +132,14 @@ func (s *WebSocket) readClientMessage(ctx context.Context, socket *socket, room 
 	}, 1)
 	switch msg.Type {
 	case roomApi.UpdateRoomInfoType:
-		updateRoomInfoContent := msg.Content.(*roomApi.UpdateRoomInfoContent)
-		if updateRoomInfoContent.Info == nil {
+		updateRoomInfoContent := msg.Content.(*roomApi.Info)
+		if updateRoomInfoContent == nil {
 			socket.writeWebsocketError(fmt.Errorf("update room info content info is nil"))
 			return nil
 		}
-		updateRoomInfoContent.Info.Address = room.GetRoomAddress()
-		info, err := s.roomManager.UpdateRoomOption(ctx, updateRoomInfoContent.Info)
-		updateRoomInfoContent.Info = info
+		updateRoomInfoContent.Address = room.GetRoomAddress()
+		info, err := s.roomManager.UpdateRoomOption(ctx, updateRoomInfoContent)
+		updateRoomInfoContent = info
 		if err != nil {
 			socket.writeWebsocketError(err)
 			return nil
@@ -350,20 +350,6 @@ func (s *WebSocket) CreateRoom(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		writeResponse(rw, common.NewErrorResponse(fmt.Errorf("get body error %s", err)))
-		return
-	}
-
-	secretOpt := &RoomOptions{}
-	if len(body) > 0 {
-		err = json.Unmarshal(body, secretOpt)
-		if err != nil {
-			writeResponse(rw, common.NewErrorResponse(fmt.Errorf("parse body error %s", err)))
-			return
-		}
-	}
 
 	conn, err := upgrader.Upgrade(rw, r, nil)
 	if err != nil {
@@ -378,6 +364,10 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 	userId := r.URL.Query().Get("userId")
 	forceCreate := r.URL.Query().Get("forceCreate")
 	address, err := eventApi.NewAddressFromID(id)
+	secretOpt := &RoomOptions{
+		Secret:    r.URL.Query().Get("secret"),
+		UseSecret: r.URL.Query().Get("useSecret") == "true",
+	}
 	socket := &socket{conn: conn}
 	if err != nil {
 		socket.writeWebsocketError(roomApi.NewRoomNotFoundError(err.Error()))
@@ -392,16 +382,12 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 			Group: group,
 		},
 		Address: address,
-		Secret:  address.ID,
+		Secret:  secretOpt.Secret,
 	}
 
 	var room roomApi.RemoteRoom
 	if forceCreate == "true" {
-		roomTags := getTags(r.URL.Query(), "room.")
-		roomName := r.URL.Query().Get("room.name")
-		roomGroup := r.URL.Query().Get("room.group")
-
-		opt := roomApi.NewRoomInfo(roomName, secretOpt.Secret, secretOpt.UseSecret, roomTags, roomGroup, address)
+		opt := roomApi.NewRoomInfo("", secretOpt.Secret, secretOpt.UseSecret, map[string]string{}, "", address)
 		room, err = s.roomManager.ForceJoinRoom(r.Context(), connection, joinOpt, opt)
 	} else {
 		room, err = s.roomManager.JoinRoom(r.Context(), connection, joinOpt)
