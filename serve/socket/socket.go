@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"runtime/debug"
@@ -97,7 +98,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func readClientMessage(ctx context.Context, socket *socket, room roomApi.RemoteRoom) error {
+func (s *WebSocket) readClientMessage(ctx context.Context, socket *socket, room roomApi.RemoteRoom) error {
 	if room.IsClose() {
 		return roomApi.NewRoomCloseError("room %s is already close", room.GetRoomAddress().ID)
 	}
@@ -129,14 +130,34 @@ func readClientMessage(ctx context.Context, socket *socket, room roomApi.RemoteR
 	metric.Count("server_read_message", map[string]string{
 		"type": msg.Type,
 	}, 1)
-	err = room.SendMessage(ctx, msg)
-	if err != nil {
-		socket.writeWebsocketError(err)
-		return nil
-	}
+	switch msg.Type {
+	case roomApi.UpdateRoomInfoType:
+		updateRoomInfoContent := msg.Content.(*roomApi.UpdateRoomInfoContent)
+		if updateRoomInfoContent.Info == nil {
+			socket.writeWebsocketError(fmt.Errorf("update room info content info is nil"))
+			return nil
+		}
+		updateRoomInfoContent.Info.Address = room.GetRoomAddress()
+		info, err := s.roomManager.UpdateRoomOption(ctx, updateRoomInfoContent.Info)
+		updateRoomInfoContent.Info = info
+		if err != nil {
+			socket.writeWebsocketError(err)
+			return nil
+		}
 
-	if msg.Type == roomApi.PingType {
+		msg.Content = updateRoomInfoContent
+		socket.WriteDataIgnoreError(msg)
+		return nil
+	case roomApi.PingType:
 		socket.WriteDataIgnoreError(msg.GetPong())
+		return nil
+	default:
+		err = room.SendMessage(ctx, msg)
+		if err != nil {
+			socket.writeWebsocketError(err)
+			return nil
+		}
+
 	}
 
 	return nil
@@ -230,7 +251,7 @@ func (s *WebSocket) serveRoom(opt *roomApi.Info, connection *roomApi.Connection,
 			retCode = "room_close"
 			return
 		default:
-			err := readClientMessage(cancelCtx, socket, room)
+			err := s.readClientMessage(cancelCtx, socket, room)
 			if err != nil {
 				retCode = "read_message_close"
 				socket.writeWebsocketError(err)
@@ -269,13 +290,6 @@ func (s *WebSocket) ListRooms(rw http.ResponseWriter, r *http.Request) {
 	writeResponse(rw, common.NewSuccessResponse(rooms))
 }
 
-type CreateRoomParams struct {
-	Group    string            `json:"group"`
-	Name     string            `json:"name"`
-	Password string            `json:"password"`
-	Tags     map[string]string `json:"tags"`
-}
-
 func getTags(query url.Values, prefix string) map[string]string {
 	tags := make(map[string]string, len(query))
 	for k, v := range query {
@@ -295,18 +309,32 @@ func getTags(query url.Values, prefix string) map[string]string {
 	return tags
 }
 
+type RoomOptions struct {
+	Secret    string `json:"secret"`
+	UseSecret bool   `json:"useSecret"`
+}
+
 func (s *WebSocket) CreateRoom(rw http.ResponseWriter, r *http.Request) {
 	address := s.roomManager.AddressManager.GeneratorRoomAddress()
 	name := r.URL.Query().Get("name")
 	group := r.URL.Query().Get("group")
 	tags := getTags(r.URL.Query(), "")
-	if name == "" || group == "" {
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
 		writeResponse(rw, common.NewErrorResponse(errors.New("name or group missing")))
 		return
 	}
-
-	opt := roomApi.NewRoomInfo(name, address.ID, tags, group, address)
-	_, err := s.roomManager.CreateLocalRoom(r.Context(), opt)
+	secretOpt := &RoomOptions{}
+	if len(body) > 0 {
+		err = json.Unmarshal(body, secretOpt)
+		if err != nil {
+			writeResponse(rw, common.NewErrorResponse(fmt.Errorf("parse body error %s", err)))
+			return
+		}
+	}
+	opt := roomApi.NewRoomInfo(name, secretOpt.Secret, secretOpt.UseSecret, tags, group, address)
+	_, err = s.roomManager.CreateLocalRoom(r.Context(), opt)
 	if err != nil {
 		writeResponse(rw, common.NewErrorResponse(err))
 		return
@@ -322,6 +350,21 @@ func (s *WebSocket) CreateRoom(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeResponse(rw, common.NewErrorResponse(fmt.Errorf("get body error %s", err)))
+		return
+	}
+
+	secretOpt := &RoomOptions{}
+	if len(body) > 0 {
+		err = json.Unmarshal(body, secretOpt)
+		if err != nil {
+			writeResponse(rw, common.NewErrorResponse(fmt.Errorf("parse body error %s", err)))
+			return
+		}
+	}
+
 	conn, err := upgrader.Upgrade(rw, r, nil)
 	if err != nil {
 		joinLog.Error(fmt.Errorf("websocket upgrader error%w", err))
@@ -345,17 +388,20 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 	connection.Name = name
 	connection.UserID = userId
 	joinOpt := &roomApi.Info{
-		Group:    group,
-		Address:  address,
-		Password: address.ID,
+		BasicInfo: roomApi.BasicInfo{
+			Group: group,
+		},
+		Address: address,
+		Secret:  address.ID,
 	}
+
 	var room roomApi.RemoteRoom
 	if forceCreate == "true" {
 		roomTags := getTags(r.URL.Query(), "room.")
 		roomName := r.URL.Query().Get("room.name")
 		roomGroup := r.URL.Query().Get("room.group")
 
-		opt := roomApi.NewRoomInfo(roomName, address.ID, roomTags, roomGroup, address)
+		opt := roomApi.NewRoomInfo(roomName, secretOpt.Secret, secretOpt.UseSecret, roomTags, roomGroup, address)
 		room, err = s.roomManager.ForceJoinRoom(r.Context(), connection, joinOpt, opt)
 	} else {
 		room, err = s.roomManager.JoinRoom(r.Context(), connection, joinOpt)

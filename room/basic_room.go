@@ -1,8 +1,6 @@
 package room
 
 import (
-	"context"
-
 	"github.com/HuolalaTech/page-spy-api/state"
 )
 
@@ -22,7 +20,7 @@ func (r *basicRoom) Done() chan struct{} {
 	return r.done
 }
 
-func (r *basicRoom) close(ctx context.Context) error {
+func (r *basicRoom) close() error {
 	if r.IsStatus(state.CloseStatus) {
 		return nil
 	}

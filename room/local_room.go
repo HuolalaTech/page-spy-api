@@ -14,19 +14,26 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func NewLocalRoom(opt *room.Info, event event.EventEmitter, addressManager *rpc.AddressManager) room.Room {
-	logger := log.WithField("room", opt.Address.ID)
-	logger.Infof("local room created")
+func NewLocalRoom(opt *room.Info, event event.EventEmitter, addressManager *rpc.AddressManager) (room.Room, error) {
+	if opt.UseSecret && opt.Secret == "" {
+		return nil, fmt.Errorf("room %s use secret but secret is empty", opt.Address.ID)
+	}
+
 	opt.Connections = make([]*room.Connection, 0)
 	opt.CreatedAt = time.Now()
 	opt.ActiveAt = time.Now()
+
+	logger := log.WithField("room", opt.Address.ID)
+	logger.Infof("local room created")
+
 	return &localRoom{
+
 		basicRoom: newBasicRoom(),
 		log:       logger,
 		Info:      opt,
 		event:     event,
 		messages:  make(chan *room.Message, 2000),
-	}
+	}, nil
 }
 
 type localRoom struct {
@@ -54,6 +61,10 @@ func (r *localRoom) GetGroup() string {
 
 func (r *localRoom) GetInfo() *room.Info {
 	return r.Info
+}
+
+func (r *localRoom) UpdateInfo(info *room.Info) {
+	r.Info.Update(info)
 }
 
 func (r *localRoom) GetTags() map[string]string {
@@ -119,8 +130,8 @@ func (r *localRoom) Join(ctx context.Context, connection *room.Connection, opt *
 		return fmt.Errorf("connection %s join room %s failed", connection.Address.ID, opt.Address.ID)
 	}
 
-	if r.Info.Password != opt.Password {
-		return fmt.Errorf("join failed, password from connection %s of room %s is invalid, correct password is %s", connection.Address.ID, opt.Address.ID, opt.Password)
+	if r.Info.UseSecret && r.Info.Secret != opt.Secret {
+		return fmt.Errorf("join failed, password from connection %s of room %s is invalid", connection.Address.ID, opt.Address.ID)
 	}
 
 	r.log.Infof("connection %s joined room", connection.Address.ID)
@@ -139,10 +150,6 @@ func (r *localRoom) Leave(ctx context.Context, connection *room.Connection, opt 
 		return fmt.Errorf("connection %s leave room %s failed", connection.Address.ID, opt.Address.ID)
 	}
 
-	if r.Info.Password != opt.Password {
-		return fmt.Errorf("leave failed, password from connection %s of room %s is invalid, correct password is %s", connection.Address.ID, opt.Address.ID, opt.Password)
-	}
-
 	r.log.Infof("connection %s left room %s", connection.Address.ID, opt.Address.ID)
 	r.removeConnectionWithLock(connection)
 	r.SendMessageWithTimeout(room.NewLeaveMessage(connection), 5*time.Second)
@@ -153,7 +160,7 @@ func (r *localRoom) Ping() {
 	r.Info.ActiveAt = time.Now()
 }
 
-func (r *localRoom) pingMessage(ctx context.Context) error {
+func (r *localRoom) pingMessage() error {
 	r.Ping()
 	return nil
 }
@@ -245,7 +252,7 @@ func (r *localRoom) SendMessage(ctx context.Context, msg *room.Message) error {
 	case room.BroadcastType:
 		return r.broadcastMessage(ctx, msg)
 	case room.PingType:
-		return r.pingMessage(ctx)
+		return r.pingMessage()
 	}
 
 	if !room.NotMessageType(msg.Type) {
@@ -277,7 +284,7 @@ func (r *localRoom) Close(ctx context.Context) error {
 		"action": "close",
 		"code":   r.closeCode,
 	}, 1)
-	err := r.close(ctx)
+	err := r.close()
 	if err != nil {
 		return err
 	}

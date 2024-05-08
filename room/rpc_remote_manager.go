@@ -35,6 +35,9 @@ type RemoteRpcRoomManager struct {
 }
 
 func (r *RemoteRpcRoomManager) getRpcByAddress(address *event.Address) (*localRpc.RpcClient, error) {
+	if address == nil {
+		return nil, fmt.Errorf("get rpc address is nil")
+	}
 	rpc := r.rpcManager.GetRpcByAddress(address)
 	if rpc == nil {
 		return nil, fmt.Errorf("rpc client %s not found", address.MachineID)
@@ -89,7 +92,9 @@ func (r *RemoteRpcRoomManager) ListRooms(ctx context.Context, tags map[string]st
 
 	infos := make([]*room.Info, 0)
 	for _, r := range rooms {
-		infos = append(infos, r.GetInfo())
+		i := r.GetInfo()
+		i.Secret = "-"
+		infos = append(infos, i)
 	}
 
 	sort.SliceStable(infos, func(i, j int) bool {
@@ -116,6 +121,21 @@ func (r *RemoteRpcRoomManager) CreateRoom(ctx context.Context, info *room.Info) 
 	}
 
 	return r.CreateRemoteRoom(ctx, info)
+}
+
+func (r *RemoteRpcRoomManager) UpdateRoomOption(ctx context.Context, info *room.Info) (*room.Info, error) {
+	req := NewRpcLocalRoomManagerRequest()
+	req.Info = info
+	res := NewRpcLocalRoomManagerResponse()
+	rpcClient, err := r.getRpcByAddress(info.Address)
+	if err != nil {
+		return nil, err
+	}
+	err = rpcClient.Call(ctx, "LocalRpcRoomManager.UpdateRoomOption", req, res)
+	if err != nil {
+		return nil, err
+	}
+	return res.Room.Info, nil
 }
 
 func (r *RemoteRpcRoomManager) CreateRemoteRoom(ctx context.Context, info *room.Info) (room.Room, error) {
@@ -173,24 +193,7 @@ func (r *RemoteRpcRoomManager) RemoveRoom(ctx context.Context, info *room.Info) 
 	return rpcClient.Call(ctx, "LocalRpcRoomManager.RemoveRoom", req, res)
 }
 
-func (r *RemoteRpcRoomManager) getRemoteRoom(info *room.Info) (room.RemoteRoom, bool) {
-	room, exist := r.getRoom(info)
-	if !exist {
-		return nil, false
-	}
-	return room.(*remoteRoom), true
-}
-
 func (r *RemoteRpcRoomManager) LeaveRoom(ctx context.Context, info *room.Info, connection *room.Connection) error {
-	room, exist := r.getRemoteRoom(info)
-	if exist {
-		r.removeRoom(room)
-		err := room.Close(ctx)
-		if err != nil {
-			log.Error("remote rpc room manager leaver room error %w", err)
-		}
-	}
-
 	req := NewRpcLocalRoomManagerRequest()
 	req.Info = info
 	req.Connection = connection
@@ -201,31 +204,6 @@ func (r *RemoteRpcRoomManager) LeaveRoom(ctx context.Context, info *room.Info, c
 	}
 
 	return rpcClient.Call(ctx, "LocalRpcRoomManager.LeaveRoom", req, res)
-}
-
-func (r *RemoteRpcRoomManager) CreateAndJoinRoom(ctx context.Context, connection *room.Connection, opt *room.Info) (room.RemoteRoom, error) {
-	room, err := r.CreateLocalRoom(ctx, opt)
-	if err != nil {
-		return nil, err
-	}
-
-	remoteRoom, err := NewRemoteRoom(connection, opt, r.event, room)
-	if err != nil {
-		return nil, err
-	}
-
-	err = remoteRoom.Start(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	r.addRoom(remoteRoom)
-	_, err = r.JoinRoom(ctx, connection, opt)
-	if err != nil {
-		return nil, err
-	}
-
-	return remoteRoom, nil
 }
 
 func (r *RemoteRpcRoomManager) ForceJoinRoom(ctx context.Context, connection *room.Connection, opt *room.Info, roomOpt *room.Info) (room.RemoteRoom, error) {

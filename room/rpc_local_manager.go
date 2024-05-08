@@ -86,7 +86,17 @@ func (r *LocalRpcRoomManager) CreateConnection(_ *http.Request, req *RpcLocalRoo
 	res.Connection = c
 	return nil
 }
+func (r *LocalRpcRoomManager) UpdateRoomOption(_ *http.Request, req *RpcLocalRoomManagerRequest, res *RpcLocalRoomManagerResponse) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(req.ContextTimeout)*time.Second)
+	defer cancel()
+	room, err := r.localRoomManager.UpdateRoomOption(ctx, req.Info)
+	if err != nil {
+		return res.SetError(err)
+	}
 
+	res.Room = room.(*localRoom)
+	return nil
+}
 func (r *LocalRpcRoomManager) CreateRoom(_ *http.Request, req *RpcLocalRoomManagerRequest, res *RpcLocalRoomManagerResponse) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(req.ContextTimeout)*time.Second)
 	defer cancel()

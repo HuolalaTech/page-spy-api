@@ -70,13 +70,40 @@ func (r *LocalRoomManager) isFull() bool {
 	return len(rooms) >= int(r.maxRoomSize)
 }
 
+func (r *LocalRoomManager) UpdateRoomOption(ctx context.Context, info *room.Info) (room.Room, error) {
+	if info.Address == nil {
+		return nil, errors.New("update room options address is nil")
+	}
+
+	findRoom, ok := r.getLocalRoom(info)
+	if !ok {
+		return nil, fmt.Errorf("room %s not found", info.Address.ID)
+	}
+
+	findRoom.Info.Update(info)
+	return findRoom, nil
+}
+
 func (r *LocalRoomManager) CreateRoom(ctx context.Context, info *room.Info) (room.Room, error) {
 	if r.isFull() {
 		return nil, errors.New("the maximum number of rooms has been reached and no more can be created")
 	}
 
-	room := NewLocalRoom(info, r.event, r.AddressManager)
-	err := room.Start(ctx)
+	if info.Address == nil {
+		return nil, errors.New("create room address is nil")
+	}
+
+	findRoom, ok := r.getLocalRoom(info)
+	if ok {
+		return findRoom, nil
+	}
+
+	room, err := NewLocalRoom(info, r.event, r.AddressManager)
+	if err != nil {
+		return nil, err
+	}
+
+	err = room.Start(ctx)
 	if err != nil {
 		return nil, err
 	}

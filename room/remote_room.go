@@ -48,6 +48,10 @@ func (r *remoteRoom) GetInfo() *room.Info {
 	return r.rpcRoom.GetInfo()
 }
 
+func (r *remoteRoom) UpdateInfo(info *room.Info) {
+	r.rpcRoom.UpdateInfo(info)
+}
+
 func (r *remoteRoom) Start(ctx context.Context) error {
 	r.log.Infof("remote room %s started", r.opt.Address.ID)
 	metric.Count("tunnel_remote_room", map[string]string{
@@ -127,7 +131,7 @@ func (r *remoteRoom) OnMessage() chan *room.Message {
 
 func (r *remoteRoom) Close(ctx context.Context) error {
 	r.log.Infof("room closed")
-	err := r.close(ctx)
+	err := r.close()
 	if err != nil {
 		return err
 	}
