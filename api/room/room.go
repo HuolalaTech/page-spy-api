@@ -10,19 +10,18 @@ import (
 )
 
 const (
-	BroadcastType = "broadcast"
-	MessageType   = "message"
-	// BroadcastType = "message"
-	// MessageType   = "send"
-	ConnectType = "connect"
-	StartType   = "start"
-	CloseType   = "close"
-	PingType    = "ping"
-	PongType    = "pong"
-	JoinType    = "join"
-	ErrorType   = "error"
-	LeaveType   = "leave"
-	UnknownType = "unknown"
+	BroadcastType      = "broadcast"
+	ConnectType        = "connect"
+	StartType          = "start"
+	CloseType          = "close"
+	PingType           = "ping"
+	PongType           = "pong"
+	UpdateRoomInfoType = "updateRoomInfo"
+	MessageType        = "message"
+	JoinType           = "join"
+	ErrorType          = "error"
+	LeaveType          = "leave"
+	UnknownType        = "unknown"
 )
 
 type RawMessage struct {
@@ -74,7 +73,7 @@ func (m *Message) ToString() string {
 
 func IsPublicMessageType(messageType string) bool {
 	switch messageType {
-	case BroadcastType, MessageType, PingType:
+	case BroadcastType, UpdateRoomInfoType, MessageType, PingType:
 		return true
 	}
 
@@ -93,6 +92,8 @@ func NotMessageType(messageType string) bool {
 		return false
 	case JoinType, LeaveType:
 		return false
+	case UpdateRoomInfoType:
+		return false
 	case UnknownType:
 		return true
 	}
@@ -109,6 +110,8 @@ func NewMessageContent(messageType string) interface{} {
 		return &BroadcastMessageContent{}
 	case PingType:
 		return &PingContent{}
+	case UpdateRoomInfoType:
+		return &UpdateRoomInfoContent{}
 	case CloseType, StartType:
 		return &StartOrCloseMessageContent{}
 	case ErrorType:
@@ -120,6 +123,10 @@ func NewMessageContent(messageType string) interface{} {
 	}
 
 	return &unknownContent
+}
+
+type UpdateRoomInfoContent struct {
+	Info *Info `json:"info"`
 }
 
 type PingContent struct {
@@ -235,24 +242,45 @@ type Connection struct {
 	Name      string         `json:"name"`
 }
 
+type BasicInfo struct {
+	Name  string            `json:"name"`
+	Group string            `json:"group"`
+	Tags  map[string]string `json:"tags"`
+}
 type Info struct {
-	Name        string            `json:"name"`
-	Address     *event.Address    `json:"address"`
-	Password    string            `json:"password"`
-	Group       string            `json:"group"`
-	Tags        map[string]string `json:"tags"`
-	CreatedAt   time.Time         `json:"createdAt"`
-	ActiveAt    time.Time         `json:"activeAt"`
-	Connections []*Connection     `json:"connections"`
+	BasicInfo
+	Address     *event.Address `json:"address"`
+	Secret      string         `json:"secret"`
+	UseSecret   bool           `json:"useSecret"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	ActiveAt    time.Time      `json:"activeAt"`
+	Connections []*Connection  `json:"connections"`
 }
 
-func NewRoomInfo(name string, password string, tags map[string]string, group string, address *event.Address) *Info {
+func (i *Info) Update(info *Info) {
+	if info.Name != "" {
+		i.Name = info.Name
+	}
+
+	if info.Group != "" {
+		i.Group = info.Group
+	}
+
+	if len(info.Tags) > 0 {
+		i.Tags = info.Tags
+	}
+}
+
+func NewRoomInfo(name string, secret string, useSecret bool, tags map[string]string, group string, address *event.Address) *Info {
 	return &Info{
-		Name:        name,
+		BasicInfo: BasicInfo{
+			Group: group,
+			Tags:  tags,
+			Name:  name,
+		},
 		Address:     address,
-		Password:    password,
-		Group:       group,
-		Tags:        tags,
+		Secret:      secret,
+		UseSecret:   useSecret,
 		Connections: make([]*Connection, 0),
 		CreatedAt:   time.Now(),
 		ActiveAt:    time.Now(),
@@ -261,7 +289,8 @@ func NewRoomInfo(name string, password string, tags map[string]string, group str
 
 type RpcRoom interface {
 	GetRoomAddress() *event.Address
-	GetInfo() *Info // 静态信息，并不会动态刷新。
+	GetInfo() *Info
+	UpdateInfo(info *Info)
 }
 
 type ManagerRoom interface {
