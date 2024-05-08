@@ -196,15 +196,9 @@ func (c *CoreApi) CleanFile() error {
 }
 
 func NewCore(config *config.Config, storage storage.StorageApi, taskManager *task.TaskManager, data data.DataApi, addressManager *rpc.AddressManager, rpcManager *rpc.RpcManager) (*CoreApi, error) {
-	maxLogFileSizeOfMb := config.MaxLogFileSizeOfMB
-	if config.MaxLogFileSizeOfMB <= 0 {
-		maxLogFileSizeOfMb = 10 * 1024 // default log size 10GB
-	}
+	maxLogFileSizeOfMb := config.GetMaxLogFileSizeOfMB()
 
-	maxLifeOfHour := config.MaxLogLifeTimeOfHour
-	if maxLifeOfHour <= 0 {
-		maxLifeOfHour = 30 * 24 // default log life 30 day
-	}
+	maxLifeOfHour := config.GetMaxLogLifeTimeOfHour()
 
 	coreApi := &CoreApi{
 		storage:        storage,

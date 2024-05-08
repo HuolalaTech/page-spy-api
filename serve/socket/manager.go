@@ -11,7 +11,7 @@ import (
 
 func NewManager(config *config.Config, rpcManager *rpc.RpcManager, addressManager *rpc.AddressManager) (*room.RemoteRpcRoomManager, error) {
 	localEvent := event.NewLocalEventEmitter(addressManager, rpcManager)
-	localRoomManager := room.NewLocalRoomManager(localEvent, addressManager, int64(config.MaxRoomNumber))
+	localRoomManager := room.NewLocalRoomManager(localEvent, addressManager, int64(config.GetMaxRoomNumber()))
 	localRoomManager.Start()
 	_, err := event.NewRpcEventEmitter(localEvent, rpcManager)
 	if err != nil {
