@@ -417,3 +417,34 @@ func (s *WebSocket) JoinRoom(rw http.ResponseWriter, r *http.Request) {
 
 	s.serveRoom(joinOpt, connection, socket, room)
 }
+
+func (s *WebSocket) CheckRoomSecret(rw http.ResponseWriter, r *http.Request) {
+	secret := r.URL.Query().Get("secret")
+	if secret == "" {
+		writeResponse(rw, common.NewErrorResponse(fmt.Errorf("'secret' cannot be empty")))
+		return
+	}
+
+	id := r.URL.Query().Get("address")
+	address, err := eventApi.NewAddressFromID(id)
+
+	if err != nil {
+		writeResponse(rw, common.NewErrorResponse(err))
+		return
+	}
+
+	room, err := s.roomManager.GetRoom(r.Context(), &roomApi.Info{
+		Address: address,
+	})
+
+	if err != nil {
+		writeResponse(rw, common.NewErrorResponse(err))
+		return
+	}
+
+	if secret == room.GetInfo().Secret {
+		writeResponse(rw, common.NewSuccessResponse(nil))
+	} else {
+		writeResponse(rw, common.NewErrorResponse(fmt.Errorf("wrong secret")))
+	}
+}

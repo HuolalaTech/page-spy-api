@@ -68,6 +68,11 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return nil
 	})
 
+	route.GET("/room/check", func(c echo.Context) error {
+		socket.CheckRoomSecret(c.Response(), c.Request())
+		return nil
+	})
+
 	route.GET("/log/download", func(c echo.Context) error {
 		fileId := c.QueryParam("fileId")
 		machine, err := core.GetMachineIdByFileName(fileId)
