@@ -201,18 +201,18 @@ func NewJoinMessage(connection *Connection) *Message {
 }
 
 type MessageMessageContent struct {
-	Data interface{} `json:"data"`
-	From *Connection `json:"from"`
-	To   *Connection `json:"to"`
+	Data json.RawMessage `json:"data"`
+	From *Connection     `json:"from"`
+	To   *Connection     `json:"to"`
 }
 
 type BroadcastMessageContent struct {
-	Data        interface{} `json:"data"`
-	From        *Connection `json:"from"`
-	IncludeSelf bool        `json:"includeSelf"`
+	Data        json.RawMessage `json:"data"`
+	From        *Connection     `json:"from"`
+	IncludeSelf bool            `json:"includeSelf"`
 }
 
-func NewBroadcastMessage(data interface{}, from *Connection) *Message {
+func NewBroadcastMessage(data json.RawMessage, from *Connection) *Message {
 	return &Message{
 		Type:      BroadcastType,
 		CreatedAt: time.Now().UnixNano() / int64(time.Millisecond),
@@ -223,7 +223,7 @@ func NewBroadcastMessage(data interface{}, from *Connection) *Message {
 	}
 }
 
-func NewSendMessage(data string, from *Connection, to *Connection) *Message {
+func NewSendMessage(data json.RawMessage, from *Connection, to *Connection) *Message {
 	return &Message{
 		Type:      MessageType,
 		CreatedAt: time.Now().UnixNano() / int64(time.Millisecond),
