@@ -295,8 +295,8 @@ type RpcRoom interface {
 
 type ManagerRoom interface {
 	RpcRoom
-	ShouldRemove() bool
-	Close(ctx context.Context) error
+	ShouldRemove() (string, bool)
+	Close(ctx context.Context, closeCode string) error
 	IsClose() bool
 }
 

@@ -129,7 +129,7 @@ func (r *remoteRoom) OnMessage() chan *room.Message {
 	return r.messages
 }
 
-func (r *remoteRoom) Close(ctx context.Context) error {
+func (r *remoteRoom) Close(ctx context.Context, code string) error {
 	r.log.Infof("room closed")
 	err := r.close()
 	if err != nil {
@@ -138,19 +138,19 @@ func (r *remoteRoom) Close(ctx context.Context) error {
 
 	metric.Count("tunnel_remote_room", map[string]string{
 		"action": "close",
-		"code":   "close",
+		"code":   code,
 	}, 1)
 	r.eventEmitter.RemoveListener(r.connection.Address, r)
 	return nil
 }
 
-func (r *remoteRoom) ShouldRemove() bool {
+func (r *remoteRoom) ShouldRemove() (string, bool) {
 	if r.StatusMachine.IsStatus(state.CloseStatus) {
-		return true
+		return "close", true
 	}
 
 	now := time.Now()
-	return now.Sub(r.createdAt) > 1*time.Hour || now.Sub(r.activeAt) > 20*time.Second
+	return "timeout", now.Sub(r.createdAt) > 1*time.Hour || now.Sub(r.activeAt) > 20*time.Second
 }
 
 func (r *remoteRoom) Listen(ctx context.Context, msg *event.Package) {
@@ -172,7 +172,7 @@ func (r *remoteRoom) Listen(ctx context.Context, msg *event.Package) {
 	case r.messages <- roomMsg:
 		if roomMsg.Type == room.CloseType {
 			r.log.Infof("received close message")
-			r.Close(ctx)
+			r.Close(ctx, "remote_close")
 		}
 
 		return

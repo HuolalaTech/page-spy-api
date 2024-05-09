@@ -128,7 +128,7 @@ func (r *LocalRoomManager) RemoveRoom(ctx context.Context, opt *room.Info) error
 	}
 
 	r.removeRoom(room)
-	return room.Close(ctx)
+	return room.Close(ctx, "remove")
 }
 
 func (r *LocalRoomManager) getLocalRoom(opt *room.Info) (*localRoom, bool) {
@@ -173,10 +173,11 @@ func (r *LocalRoomManager) LeaveRoom(ctx context.Context, opt *room.Info, connec
 		r.log.WithError(err).Errorf("room manager leave room %s error", opt.Address.ID)
 	}
 
-	if room.ShouldRemove() {
+	code, ok := room.ShouldRemove()
+	if ok {
 		r.log.WithError(err).Errorf("room manager close room %s", opt.Address.ID)
 		r.removeRoom(room)
-		return room.Close(ctx)
+		return room.Close(ctx, code)
 	}
 
 	return nil

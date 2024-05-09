@@ -27,12 +27,13 @@ func NewLocalRoom(opt *room.Info, event event.EventEmitter, addressManager *rpc.
 	logger.Infof("local room created")
 
 	return &localRoom{
-
-		basicRoom: newBasicRoom(),
-		log:       logger,
-		Info:      opt,
-		event:     event,
-		messages:  make(chan *room.Message, 2000),
+		basicRoom:   newBasicRoom(),
+		closeCode:   "unknown",
+		closeReason: "unknown",
+		log:         logger,
+		Info:        opt,
+		event:       event,
+		messages:    make(chan *room.Message, 1000),
 	}, nil
 }
 
@@ -276,7 +277,7 @@ func (r *localRoom) OnMessage() chan *room.Message {
 	return r.messages
 }
 
-func (r *localRoom) Close(ctx context.Context) error {
+func (r *localRoom) Close(ctx context.Context, closeCode string) error {
 	if r.StatusMachine.IsStatus(state.CloseStatus) {
 		return nil
 	}
@@ -284,6 +285,7 @@ func (r *localRoom) Close(ctx context.Context) error {
 		"action": "close",
 		"code":   r.closeCode,
 	}, 1)
+
 	err := r.close()
 	if err != nil {
 		return err
@@ -295,9 +297,9 @@ func (r *localRoom) Close(ctx context.Context) error {
 	return nil
 }
 
-func (r *localRoom) ShouldRemove() bool {
+func (r *localRoom) ShouldRemove() (string, bool) {
 	if r.StatusMachine.IsStatus(state.CloseStatus) {
-		return true
+		return r.closeCode, true
 	}
 
 	now := time.Now()
@@ -320,7 +322,7 @@ func (r *localRoom) ShouldRemove() bool {
 		r.closeCode = "maxTimeRoom"
 	}
 
-	return noUseInitRoom || noUserRoom || noUseRoom || maxTimeRoom
+	return r.closeCode, noUseInitRoom || noUserRoom || noUseRoom || maxTimeRoom
 }
 
 func (r *localRoom) isEmpty() bool {

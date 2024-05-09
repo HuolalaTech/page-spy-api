@@ -104,9 +104,10 @@ func (r *BasicManager) loop() {
 	}, value)
 
 	for _, room := range rooms {
-		if room.ShouldRemove() {
+		code, ok := room.ShouldRemove()
+		if ok {
 			r.removeRoom(room)
-			err := room.Close(context.Background())
+			err := room.Close(context.Background(), code)
 			if err != nil {
 				log.WithError(err).Error("loop close room error")
 			}

@@ -188,6 +188,7 @@ func (s *WebSocket) serveRoom(opt *roomApi.Info, connection *roomApi.Connection,
 		if err != nil {
 			joinLog.Errorf("serveRoom %s close %v code %s", opt.Address.ID, err, retCode)
 		}
+		room.Close(context.Background(), retCode)
 	}
 
 	cancelCtx, cancel := context.WithCancel(context.Background())

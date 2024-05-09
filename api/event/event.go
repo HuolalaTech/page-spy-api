@@ -72,7 +72,7 @@ type Package struct {
 type Listener interface {
 	Listen(ctx context.Context, pkg *Package)
 	IsClose() bool
-	Close(ctx context.Context) error
+	Close(ctx context.Context, code string) error
 }
 
 type EventEmitter interface {
