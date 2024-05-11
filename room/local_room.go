@@ -33,7 +33,7 @@ func NewLocalRoom(opt *room.Info, event event.EventEmitter, addressManager *rpc.
 		log:         logger,
 		Info:        opt,
 		event:       event,
-		messages:    make(chan *room.Message, 1000),
+		messages:    make(chan *room.Message, 2000),
 	}, nil
 }
 
