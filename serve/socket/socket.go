@@ -106,14 +106,9 @@ func (s *WebSocket) readClientMessage(ctx context.Context, socket *socket, room 
 	rawMsg := &roomApi.RawMessage{}
 	err := socket.ReadJSON(rawMsg)
 	if err != nil {
-		_, ok := err.(*websocket.CloseError)
-		if ok {
-			return roomApi.NewRoomCloseError("read message websocket error %s", err.Error())
-		}
-
-		socket.writeWebsocketError(roomApi.NewRoomCloseError("read and parse message failed, %s", err))
-		return nil
+		return roomApi.NewRoomCloseError("read message websocket error %s", err.Error())
 	}
+
 	msg, err := rawMsg.ToMessage()
 
 	if err != nil {
