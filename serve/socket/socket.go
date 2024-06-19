@@ -132,6 +132,7 @@ func (s *WebSocket) readClientMessage(ctx context.Context, socket *socket, room 
 			socket.writeWebsocketError(fmt.Errorf("update room info content info is nil"))
 			return nil
 		}
+
 		updateRoomInfoContent.Info.Address = room.GetRoomAddress()
 		info, err := s.roomManager.UpdateRoomOption(ctx, updateRoomInfoContent.Info)
 		updateRoomInfoContent.Info = info
