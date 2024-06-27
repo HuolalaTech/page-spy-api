@@ -27,7 +27,7 @@ func (f *FileApi) SaveLog(log *LogFile) error {
 	}
 
 	defer dst.Close()
-	if _, err = dst.Write(log.File); err != nil {
+	if _, err = dst.Write(log.UpdateFile); err != nil {
 		return fmt.Errorf("create log file error: %w", err)
 	}
 

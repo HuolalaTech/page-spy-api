@@ -62,17 +62,23 @@ func (e *EmptyReaderClose) Close() error {
 }
 
 func (c *CoreApi) CreateFile(file *storage.LogFile) (*storage.LogFile, error) {
-	hash := md5.Sum(file.File)
+	hash := md5.Sum(file.UpdateFile)
 	md5String := hex.EncodeToString(hash[:])
 	file.FileId = c.CreateFileId(md5String)
-	err := c.data.CreateLog(&data.LogData{
+
+	err := c.storage.SaveLog(file)
+	if err != nil {
+		return file, err
+	}
+
+	err = c.data.CreateLog(&data.LogData{
 		Model: data.Model{
 			UpdatedAt: time.Now(),
 			CreatedAt: time.Now(),
 		},
 		Tags:   file.Tags,
 		FileId: file.FileId,
-		Status: data.Created,
+		Status: data.Saved,
 		Size:   file.Size,
 		Name:   file.Name,
 	})
@@ -81,12 +87,7 @@ func (c *CoreApi) CreateFile(file *storage.LogFile) (*storage.LogFile, error) {
 		return nil, err
 	}
 
-	err = c.storage.SaveLog(file)
-	if err != nil {
-		return file, c.data.UpdateLogStatus(file.FileId, data.Error)
-	}
-
-	return file, c.data.UpdateLogStatus(file.FileId, data.Saved)
+	return file, err
 }
 
 func (c *CoreApi) getFileList(query *data.FileListQuery) (*data.Page[*data.LogData], error) {

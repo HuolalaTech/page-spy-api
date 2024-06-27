@@ -194,10 +194,10 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		}
 
 		logFile := &storage.LogFile{
-			Tags: getTags(c.QueryParams()),
-			Name: file.Filename,
-			Size: file.Size,
-			File: fileBs,
+			Tags:       getTags(c.QueryParams()),
+			Name:       file.Filename,
+			Size:       file.Size,
+			UpdateFile: fileBs,
 		}
 
 		createFile, err := core.CreateFile(logFile)

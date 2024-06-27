@@ -5,6 +5,7 @@ bin/data.db
 bin/data
 bin_back
 log
+*/__debug_bin*
 .vscode
 vendor
 .idea

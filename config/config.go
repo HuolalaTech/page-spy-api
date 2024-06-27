@@ -11,13 +11,23 @@ type CorsConfig struct {
 	ExposeHeaders []string `json:"exposeHeaders"`
 }
 
+type StorageConfig struct {
+	BaseDir  string `json:"baseDir"`
+	KeyId    string `json:"keyId"`
+	Secret   string `json:"secret"`
+	Region   string `json:"region"`
+	Endpoint string `json:"endpoint"`
+	Bucket   string `json:"bucket"`
+}
+
 type Config struct {
-	Port                string      `json:"port"`
-	Debug               bool        `json:"debug"`
-	NotAllowedDeleteLog bool        `json:"notAllowedDeleteLog"`
-	RpcAddress          []*Address  `json:"rpcAddress"`
-	CorsConfig          *CorsConfig `json:"corsConfig"`
-	MaxRoomNumber       int         `json:"maxRoomNumber"`
+	Port                string         `json:"port"`
+	Debug               bool           `json:"debug"`
+	NotAllowedDeleteLog bool           `json:"notAllowedDeleteLog"`
+	RpcAddress          []*Address     `json:"rpcAddress"`
+	CorsConfig          *CorsConfig    `json:"corsConfig"`
+	StorageConfig       *StorageConfig `json:"storageConfig"`
+	MaxRoomNumber       int            `json:"maxRoomNumber"`
 	// max log file size, unit is mb
 	MaxLogFileSizeOfMB int64 `json:"maxLogFileSizeOfMB"`
 	// max log file size, unit is day
