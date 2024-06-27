@@ -92,7 +92,6 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		c.Response().Header().Set("Content-Disposition", "attachment; filename="+file.Name)
 		c.Response().Header().Set("Content-Type", "application/octet-stream")
 		c.Response().Header().Set("Content-Length", strconv.FormatInt(file.Size, 10))
-
 		_, err = io.Copy(c.Response().Writer, file.FileSteam)
 		if err != nil {
 			return err

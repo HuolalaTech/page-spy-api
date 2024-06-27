@@ -70,6 +70,7 @@ func (a *S3Api) GetLog(fileId string) (*LogFile, error) {
 
 	return &LogFile{
 		FileId:    fileId,
+		Size:      *result.ContentLength,
 		FileSteam: result.Body,
 	}, nil
 }
