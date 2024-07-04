@@ -1,14 +1,19 @@
 package data
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"path"
 	"time"
 
 	"github.com/HuolalaTech/page-spy-api/config"
 	selfLogger "github.com/HuolalaTech/page-spy-api/logger"
+	"github.com/HuolalaTech/page-spy-api/storage"
+	"github.com/HuolalaTech/page-spy-api/task"
 	"github.com/HuolalaTech/page-spy-api/util"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -16,7 +21,20 @@ import (
 )
 
 type Data struct {
-	db *gorm.DB
+	db      *gorm.DB
+	storage storage.StorageApi
+}
+
+func getLocalDataFilePath() string {
+	if util.FileExists("data.db") {
+		return "data.db"
+	}
+
+	if util.FileExists("data/data.db") {
+		return "data/data.db"
+	}
+
+	return "data/data.db"
 }
 
 func initDataFilePath() (string, error) {
@@ -28,20 +46,28 @@ func initDataFilePath() (string, error) {
 		}
 	}
 
-	if util.FileExists("data.db") {
-		return "data.db", nil
-	}
-
-	if util.FileExists("data/data.db") {
-		return "data/data.db", nil
-	}
-
-	return "data/data.db", nil
+	return getLocalDataFilePath(), nil
 }
 
 var logger = selfLogger.Log().WithField("module", "database")
 
-func NewData(config *config.Config) (DataApi, error) {
+func NewData(config *config.Config, taskManager *task.TaskManager, storage storage.StorageApi) (DataApi, error) {
+	if config.IsRemoteStorage() {
+		logger.Infof("init database with remote storage")
+		err := loadData(config, storage)
+		if err != nil {
+			logger.Infof("load remote data error %s", err.Error())
+			return nil, err
+		}
+		logger.Infof("load remote data success")
+
+		err = taskManager.AddTask(task.NewTask("sync_data_file", 5*time.Minute, syncData(config, storage)))
+		if err != nil {
+			logger.Errorf("add sync data file task error %s", err.Error())
+			return nil, err
+		}
+	}
+
 	c := &gorm.Config{}
 	if config.Debug {
 		c.Logger = gormLogger.New(
@@ -72,7 +98,73 @@ func NewData(config *config.Config) (DataApi, error) {
 		return nil, fmt.Errorf("failed to auto migrate database")
 	}
 
-	return &Data{db: db}, nil
+	return &Data{db: db, storage: storage}, nil
+}
+
+func loadData(config *config.Config, s storage.StorageApi) error {
+	filePath := getLocalDataFilePath()
+	if util.FileExists(filePath) {
+		logger.Infof("load data already exists")
+		return nil
+	}
+
+	remotePath := path.Join(config.StorageConfig.BaseDir, filePath)
+	remoteStorage := s.(*storage.RemoteApi)
+	exist, err := remoteStorage.Exist(remotePath)
+	if err != nil {
+		return fmt.Errorf("failed to head remote data file %s", err.Error())
+	}
+	if !exist {
+		logger.Infof("load data remote data not exists")
+		return nil
+	}
+
+	body, _, err := remoteStorage.Get(remotePath)
+	if err != nil {
+		return fmt.Errorf("failed to get remote data file %s", err.Error())
+	}
+
+	if !exist {
+		return nil
+	}
+
+	defer body.Close()
+
+	file, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	if _, err := io.Copy(file, body); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func syncData(config *config.Config, s storage.StorageApi) func() error {
+	return func() error {
+		filePath := getLocalDataFilePath()
+		if !util.FileExists(filePath) {
+			return nil
+		}
+
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			logger.Errorf("Failed to read file: %v", err)
+			return err
+		}
+
+		remotePath := path.Join(config.StorageConfig.BaseDir, filePath)
+		remoteStorage := s.(*storage.RemoteApi)
+		err = remoteStorage.Save(remotePath, bytes.NewReader(content))
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
 }
 
 func (d *Data) CreateLog(log *LogData) error {
@@ -103,7 +195,7 @@ type FileListQuery struct {
 	PageQuery
 	From *int64
 	To   *int64
-	Tags []*Tag
+	Tags []*storage.Tag
 }
 
 func (f *FileListQuery) GetFrom() *time.Time {

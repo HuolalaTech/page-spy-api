@@ -71,12 +71,19 @@ func (c *CoreApi) CreateFile(file *storage.LogFile) (*storage.LogFile, error) {
 		return file, err
 	}
 
+	ts := []*data.Tag{}
+	for _, t := range file.Tags {
+		ts = append(ts, &data.Tag{
+			Key:   t.Key,
+			Value: t.Value,
+		})
+	}
 	err = c.data.CreateLog(&data.LogData{
 		Model: data.Model{
 			UpdatedAt: time.Now(),
 			CreatedAt: time.Now(),
 		},
-		Tags:   file.Tags,
+		Tags:   ts,
 		FileId: file.FileId,
 		Status: data.Saved,
 		Size:   file.Size,
@@ -209,9 +216,11 @@ func NewCore(config *config.Config, storage storage.StorageApi, taskManager *tas
 		maxSizeOfByte:  maxLogFileSizeOfMb * 1024 * 1024,
 		maxLifeOfHour:  maxLifeOfHour,
 	}
-	err := taskManager.AddTask(task.NewTask("clean_file", 1*time.Hour, coreApi.CleanFile))
-	if err != nil {
-		log.Errorf("add clean file task error %s", err.Error())
+	if !config.IsRemoteStorage() {
+		err := taskManager.AddTask(task.NewTask("clean_file", 1*time.Hour, coreApi.CleanFile))
+		if err != nil {
+			log.Errorf("add clean file task error %s", err.Error())
+		}
 	}
 
 	return coreApi, rpcManager.Regist("CoreApi", NewRpcCore(coreApi))

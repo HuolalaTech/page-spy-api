@@ -6,14 +6,18 @@ import (
 	"os"
 
 	"github.com/HuolalaTech/page-spy-api/config"
-	"github.com/HuolalaTech/page-spy-api/data"
 )
+
+type Tag struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
 
 type LogFile struct {
 	Name       string        `json:"name"`
 	FileId     string        `json:"fileId"`
 	Size       int64         `json:"size"`
-	Tags       []*data.Tag   `json:"tags"`
+	Tags       []*Tag        `json:"tags"`
 	UpdateFile []byte        `json:"-"`
 	FileSteam  io.ReadCloser `json:"-"`
 }
@@ -25,7 +29,7 @@ type StorageApi interface {
 }
 
 func NewStorage(config *config.Config) (StorageApi, error) {
-	if config.StorageConfig != nil {
+	if config.IsRemoteStorage() {
 		return NewS3Api(config.StorageConfig)
 	}
 
@@ -33,7 +37,7 @@ func NewStorage(config *config.Config) (StorageApi, error) {
 }
 
 func NewS3Api(config *config.StorageConfig) (StorageApi, error) {
-	return &S3Api{config: config}, nil
+	return &RemoteApi{config: config}, nil
 }
 
 func NewFileApi() (StorageApi, error) {

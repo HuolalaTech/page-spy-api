@@ -31,11 +31,11 @@ func include(arr []string, value string) bool {
 	return false
 }
 
-func getTags(params url.Values) []*data.Tag {
-	tags := []*data.Tag{}
+func getTags(params url.Values) []*storage.Tag {
+	tags := []*storage.Tag{}
 	for k, v := range params {
 		if include(TagName, k) {
-			tags = append(tags, &data.Tag{
+			tags = append(tags, &storage.Tag{
 				Key:   k,
 				Value: strings.Join(v, " "),
 			})

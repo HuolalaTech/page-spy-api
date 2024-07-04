@@ -34,6 +34,10 @@ type Config struct {
 	MaxLogLifeTimeOfHour int64 `json:"maxLogLifeTimeOfHour"`
 }
 
+func (c *Config) IsRemoteStorage() bool {
+	return c.StorageConfig != nil
+}
+
 func (c *Config) GetMaxLogLifeTimeOfHour() int64 {
 	if c.MaxLogLifeTimeOfHour <= 0 {
 		return 30 * 24 // default log life 30 day

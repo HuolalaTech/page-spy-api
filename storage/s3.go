@@ -3,24 +3,26 @@ package storage
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"path"
 
 	"github.com/HuolalaTech/page-spy-api/config"
 	"github.com/aws/aws-sdk-go/aws"
+	awsErr "github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
-type S3Api struct {
+type RemoteApi struct {
 	config *config.StorageConfig
 }
 
-func (a *S3Api) joinPath(id string) string {
-	return path.Join(a.config.BaseDir, id)
+func (a *RemoteApi) joinPath(id string) string {
+	return path.Join(a.config.BaseDir, "logs", id)
 }
 
-func (a *S3Api) newSession() (*session.Session, error) {
+func (a *RemoteApi) newSession() (*session.Session, error) {
 	config := a.config
 	session, err := session.NewSession(&aws.Config{
 		Region:      aws.String(config.Region),
@@ -33,7 +35,7 @@ func (a *S3Api) newSession() (*session.Session, error) {
 	return session, nil
 }
 
-func (a *S3Api) SaveLog(log *LogFile) error {
+func (a *RemoteApi) Save(path string, data io.ReadSeeker) error {
 	session, err := a.newSession()
 	if err != nil {
 		return err
@@ -42,8 +44,8 @@ func (a *S3Api) SaveLog(log *LogFile) error {
 
 	_, err = svc.PutObject(&s3.PutObjectInput{
 		Bucket: aws.String(a.config.Bucket),
-		Key:    aws.String(a.joinPath(log.FileId)),
-		Body:   bytes.NewReader(log.UpdateFile),
+		Key:    aws.String(path),
+		Body:   data,
 		ACL:    aws.String("private"),
 	})
 
@@ -53,29 +55,72 @@ func (a *S3Api) SaveLog(log *LogFile) error {
 	return nil
 }
 
-func (a *S3Api) GetLog(fileId string) (*LogFile, error) {
+func (a *RemoteApi) SaveLog(log *LogFile) error {
+	err := a.Save(a.joinPath(log.FileId), bytes.NewReader(log.UpdateFile))
+
+	if err != nil {
+		return fmt.Errorf("failed to put object: %w", err)
+	}
+	return nil
+}
+
+func (a *RemoteApi) Exist(path string) (bool, error) {
 	session, err := a.newSession()
 	if err != nil {
-		return nil, err
+		return false, err
+	}
+	svc := s3.New(session)
+
+	_, err = svc.HeadObject(&s3.HeadObjectInput{
+		Bucket: aws.String(a.config.Bucket),
+		Key:    aws.String(path),
+	})
+
+	if err != nil {
+		s3Error, ok := err.(awsErr.Error)
+		if ok && (s3Error.Code() == s3.ErrCodeNoSuchKey || s3Error.Code() == "NotFound") {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (a *RemoteApi) Get(path string) (io.ReadCloser, int64, error) {
+	session, err := a.newSession()
+	if err != nil {
+		return nil, 0, err
 	}
 	svc := s3.New(session)
 
 	result, err := svc.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(a.config.Bucket),
-		Key:    aws.String(a.joinPath(fileId)),
+		Key:    aws.String(path),
 	})
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to get object: %w", err)
+		return nil, 0, err
+	}
+
+	return result.Body, *result.ContentLength, nil
+}
+
+func (a *RemoteApi) GetLog(fileId string) (*LogFile, error) {
+	body, size, err := a.Get(a.joinPath(fileId))
+	if err != nil {
+		return nil, err
 	}
 
 	return &LogFile{
 		FileId:    fileId,
-		Size:      *result.ContentLength,
-		FileSteam: result.Body,
+		Size:      size,
+		FileSteam: body,
 	}, nil
 }
 
-func (a *S3Api) RemoveLog(fileId string) error {
+func (a *RemoteApi) RemoveLog(fileId string) error {
 	session, err := a.newSession()
 	if err != nil {
 		return err
