@@ -2,8 +2,6 @@ package route
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,6 +14,7 @@ import (
 	"github.com/HuolalaTech/page-spy-api/rpc"
 	"github.com/HuolalaTech/page-spy-api/storage"
 	"github.com/HuolalaTech/page-spy-api/task"
+	"github.com/HuolalaTech/page-spy-api/util"
 )
 
 var log = logger.Log().WithField("module", "core")
@@ -62,9 +61,7 @@ func (e *EmptyReaderClose) Close() error {
 }
 
 func (c *CoreApi) CreateFile(file *storage.LogFile) (*storage.LogFile, error) {
-	hash := md5.Sum(file.UpdateFile)
-	md5String := hex.EncodeToString(hash[:])
-	file.FileId = c.CreateFileId(md5String)
+	file.FileId = c.CreateFileId(util.MD5(file.UpdateFile))
 
 	err := c.storage.SaveLog(file)
 	if err != nil {

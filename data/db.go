@@ -21,8 +21,7 @@ import (
 )
 
 type Data struct {
-	db      *gorm.DB
-	storage storage.StorageApi
+	db *gorm.DB
 }
 
 func getLocalDataFilePath() string {
@@ -50,6 +49,27 @@ func initDataFilePath() (string, error) {
 }
 
 var logger = selfLogger.Log().WithField("module", "database")
+
+func InitData(config *gorm.Config) (*Data, error) {
+	c := &gorm.Config{}
+	dataPath, err := initDataFilePath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to init data path")
+	}
+
+	logger.Infof("init database with file %s", dataPath)
+	db, err := gorm.Open(sqlite.Open(dataPath), c)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect database")
+	}
+
+	if err := db.AutoMigrate(&LogData{}, &Tag{}); err != nil {
+		return nil, fmt.Errorf("failed to auto migrate database")
+	}
+
+	return &Data{db: db}, nil
+}
 
 func NewData(config *config.Config, taskManager *task.TaskManager, storage storage.StorageApi) (DataApi, error) {
 	if config.IsRemoteStorage() {
@@ -82,23 +102,7 @@ func NewData(config *config.Config, taskManager *task.TaskManager, storage stora
 		)
 	}
 
-	dataPath, err := initDataFilePath()
-	if err != nil {
-		return nil, fmt.Errorf("failed to init data path")
-	}
-
-	logger.Infof("init database with file %s", dataPath)
-	db, err := gorm.Open(sqlite.Open(dataPath), c)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect database")
-	}
-
-	if err := db.AutoMigrate(&LogData{}, &Tag{}); err != nil {
-		return nil, fmt.Errorf("failed to auto migrate database")
-	}
-
-	return &Data{db: db, storage: storage}, nil
+	return InitData(c)
 }
 
 func loadData(config *config.Config, s storage.StorageApi) error {
@@ -126,6 +130,11 @@ func loadData(config *config.Config, s storage.StorageApi) error {
 
 	if !exist {
 		return nil
+	}
+
+	_, err = initDataFilePath()
+	if err != nil {
+		return err
 	}
 
 	defer body.Close()

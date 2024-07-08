@@ -8,4 +8,5 @@ log
 */__debug_bin*
 .vscode
 vendor
+script
 .idea
