@@ -51,14 +51,13 @@ func initDataFilePath() (string, error) {
 var logger = selfLogger.Log().WithField("module", "database")
 
 func InitData(config *gorm.Config) (*Data, error) {
-	c := &gorm.Config{}
 	dataPath, err := initDataFilePath()
 	if err != nil {
 		return nil, fmt.Errorf("failed to init data path")
 	}
 
 	logger.Infof("init database with file %s", dataPath)
-	db, err := gorm.Open(sqlite.Open(dataPath), c)
+	db, err := gorm.Open(sqlite.Open(dataPath), config)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect database")
@@ -88,18 +87,21 @@ func NewData(config *config.Config, taskManager *task.TaskManager, storage stora
 		}
 	}
 
-	c := &gorm.Config{}
+	logLevel := gormLogger.Silent
 	if config.Debug {
-		c.Logger = gormLogger.New(
+		logLevel = gormLogger.Info
+	}
+
+	c := &gorm.Config{
+		Logger: gormLogger.New(
 			log.New(os.Stdout, "\r\n", log.LstdFlags),
 			gormLogger.Config{
 				SlowThreshold:             time.Second,
-				LogLevel:                  gormLogger.Info,
+				LogLevel:                  logLevel,
 				IgnoreRecordNotFoundError: true,
-				ParameterizedQueries:      false,
 				Colorful:                  false,
 			},
-		)
+		),
 	}
 
 	return InitData(c)
