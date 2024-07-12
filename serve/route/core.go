@@ -139,7 +139,7 @@ func (c *CoreApi) DeleteFile(fileId string) error {
 
 func (c *CoreApi) CleanFileByTime() error {
 	before := time.Now().Add(-time.Duration(c.maxLifeOfHour) * time.Hour)
-	logs, err := c.data.FindTimeoutLogs(before, 10)
+	logs, err := c.data.FindTimeoutLogs(before, 1000)
 	if err != nil {
 		return err
 	}
@@ -170,13 +170,20 @@ func (c *CoreApi) CleanFileBySize() error {
 		return nil
 	}
 
+	deleteSize := size - c.maxSizeOfByte
+
 	log.Infof("clean file by size %dmb > max size %dmb", size/(1024*1024), c.maxSizeOfByte/(1024*1024))
-	logs, err := c.data.FindOldestLogs(10)
+	logs, err := c.data.FindOldestLogs(1000)
 	if err != nil {
 		return err
 	}
 
 	for _, l := range logs {
+		deleteSize = deleteSize - l.Size
+		if deleteSize <= 0 {
+			return nil
+		}
+
 		err := c.DeleteFile(l.FileId)
 		if err != nil {
 			log.Errorf("delete file %s error %s", l.FileId, err.Error())
