@@ -30,6 +30,7 @@ func CORS(c *config.Config) echo.MiddlewareFunc {
 	if c.CorsConfig != nil {
 		if !isEmptyArray(c.CorsConfig.AllowOrigins) {
 			config.AllowOrigins = c.CorsConfig.AllowOrigins
+			config.AllowOriginFunc = nil
 		}
 
 		if !isEmptyArray(c.CorsConfig.AllowMethods) {
