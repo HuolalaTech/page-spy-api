@@ -179,7 +179,6 @@ func (c *CoreApi) CleanFileBySize() error {
 	}
 
 	for _, l := range logs {
-		deleteSize = deleteSize - l.Size
 		if deleteSize <= 0 {
 			return nil
 		}
@@ -187,8 +186,11 @@ func (c *CoreApi) CleanFileBySize() error {
 		err := c.DeleteFile(l.FileId)
 		if err != nil {
 			log.Errorf("delete file %s error %s", l.FileId, err.Error())
+		} else {
+			deleteSize = deleteSize - l.Size
+			log.Infof("clean file %s name %s by size", l.FileId, l.Name)
 		}
-		log.Infof("clean file %s name %s by size", l.FileId, l.Name)
+
 	}
 
 	return nil
@@ -221,7 +223,7 @@ func NewCore(config *config.Config, storage storage.StorageApi, taskManager *tas
 		maxLifeOfHour:  maxLifeOfHour,
 	}
 	if !config.IsRemoteStorage() {
-		err := taskManager.AddTask(task.NewTask("clean_file", 1*time.Hour, coreApi.CleanFile))
+		err := taskManager.AddTask(task.NewTask("clean_file", 10*time.Minute, coreApi.CleanFile))
 		if err != nil {
 			log.Errorf("add clean file task error %s", err.Error())
 		}
