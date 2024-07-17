@@ -3,6 +3,11 @@ package data
 import "time"
 
 type DataApi interface {
+	CreatePageLog(pageLog *PageLogData) error
+	UpdatePageLogFiles(log *PageLogData) error
+	FindPageLogByPgeId(pageId string) (*PageLogData, error)
+	FindPageLogs(query *FileListQuery) (*Page[*PageLogData], error)
+
 	CreateLog(log *LogData) error
 	FindLogs(query *FileListQuery) (*Page[*LogData], error)
 	UpdateLogStatus(fileId string, status Status) error

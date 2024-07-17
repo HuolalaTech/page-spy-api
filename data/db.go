@@ -228,6 +228,30 @@ func (f *FileListQuery) GetTo() *time.Time {
 
 	return &to
 }
+func (query *FileListQuery) getPageLogQuery(db *gorm.DB) *gorm.DB {
+	q := db
+
+	if query.Tags != nil && len(query.Tags) > 0 {
+		for i, tag := range query.Tags {
+			logTagName := fmt.Sprintf("page_log_tag%d", i)
+			tagName := fmt.Sprintf("tag%d", i)
+			q = q.Joins(fmt.Sprintf("join page_log_tags as %s on %s.log_data_id = log_data.id", logTagName, logTagName)).
+				Joins(fmt.Sprintf("join tags as %s on %s.id = %s.tag_id and %s.key = ? and %s.value like ?", tagName, tagName, logTagName, tagName, tagName), tag.Key, "%"+tag.Value+"%")
+		}
+	}
+
+	from := query.GetFrom()
+	if from != nil {
+		q = q.Where("page_log_data.created_at > ?", from)
+	}
+
+	to := query.GetTo()
+	if to != nil {
+		q = q.Where("page_log_data.created_at < ?", to)
+	}
+
+	return q.Preload("Tags").Order("page_log_data.created_at desc")
+}
 
 func (query *FileListQuery) getDB(db *gorm.DB) *gorm.DB {
 	q := db
@@ -252,6 +276,63 @@ func (query *FileListQuery) getDB(db *gorm.DB) *gorm.DB {
 	}
 
 	return q.Preload("Tags").Order("log_data.created_at desc")
+}
+func (d *Data) FindPageLogByPgeId(pageId string) (*PageLogData, error) {
+	log := &PageLogData{}
+	result := d.db.Where("page_id = ?", pageId).First(log)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+
+	return log, result.Error
+}
+
+func (d *Data) CreatePageLog(log *PageLogData) error {
+	findFile, err := d.FindPageLogByPgeId(log.PageId)
+
+	if err != nil {
+		return err
+	}
+
+	if findFile != nil {
+		return nil
+	}
+
+	result := d.db.Create(log)
+	return result.Error
+}
+
+func (d *Data) UpdatePageLogFiles(log *PageLogData) error {
+	result := d.db.Model(&LogData{}).Where("page_id = ?", log.PageId).Update("files", log.Files)
+	return result.Error
+}
+
+func (d *Data) FindPageLogs(query *FileListQuery) (*Page[*PageLogData], error) {
+	if query.Size <= 0 {
+		return nil, fmt.Errorf("size should be greater than 0")
+	}
+
+	if query.Page <= 0 {
+		return nil, fmt.Errorf("page should be greater than 0")
+	}
+
+	var logs []*PageLogData
+	offset := query.GetOffset()
+	result := query.getPageLogQuery(d.db).Offset(offset).Limit(query.Size).Find(&logs)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	var total int64
+	result = query.getPageLogQuery(d.db).Model(&LogData{}).Count(&total)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return &Page[*PageLogData]{
+		Data:  logs,
+		Total: total,
+	}, nil
 }
 
 func (d *Data) FindLogs(query *FileListQuery) (*Page[*LogData], error) {
