@@ -22,6 +22,12 @@ type LogFile struct {
 	FileSteam  io.ReadCloser `json:"-"`
 }
 
+type LogGroupFile struct {
+	*LogFile
+	GroupId   string `json:"groupId"`
+	GroupName string `json:"groupName"`
+}
+
 type StorageApi interface {
 	SaveLog(log *LogFile) error
 	GetLog(fileId string) (*LogFile, error)

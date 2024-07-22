@@ -94,6 +94,66 @@ func (c *CoreApi) CreateFile(file *storage.LogFile) (*storage.LogFile, error) {
 	return file, err
 }
 
+func (c *CoreApi) CreateGroupFile(file *storage.LogGroupFile) (*storage.LogGroupFile, error) {
+	file.FileId = c.CreateFileId(util.MD5(file.UpdateFile))
+
+	err := c.storage.SaveLog(file.LogFile)
+	if err != nil {
+		return file, err
+	}
+
+	ts := []*data.Tag{}
+	for _, t := range file.Tags {
+		ts = append(ts, &data.Tag{
+			Key:   t.Key,
+			Value: t.Value,
+		})
+	}
+
+	log := &data.LogData{
+		Model: data.Model{
+			UpdatedAt: time.Now(),
+			CreatedAt: time.Now(),
+		},
+		Tags:   ts,
+		FileId: file.FileId,
+		Status: data.Saved,
+		Size:   file.Size,
+		Name:   file.Name,
+	}
+
+	logGroup, err := c.data.FindGroupLog(file.GroupId)
+	if err != nil {
+		return nil, err
+	}
+
+	if logGroup == nil {
+		logGroup = &data.LogGroup{
+			Model: data.Model{
+				UpdatedAt: time.Now(),
+				CreatedAt: time.Now(),
+			},
+			GroupId: file.GroupId,
+			Tags:    ts,
+			Size:    file.Size,
+			Logs:    []*data.LogData{log},
+			Name:    file.GroupName,
+		}
+		return file, err
+	}
+
+	logGroup.Size = logGroup.Size + file.Size
+	logGroup.Logs = append(logGroup.Logs, log)
+
+	err = c.data.UpdateGroupLog(logGroup)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return file, err
+}
+
 func (c *CoreApi) getFileList(query *data.FileListQuery) (*data.Page[*data.LogData], error) {
 	return c.data.FindLogs(query)
 }
