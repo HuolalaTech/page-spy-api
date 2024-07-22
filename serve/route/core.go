@@ -161,8 +161,12 @@ func (c *CoreApi) DeleteLogGroup(groupId string) error {
 		return err
 	}
 
+	if logGroup == nil {
+		return nil
+	}
+
 	for _, log := range logGroup.Logs {
-		err := c.storage.RemoveLog(log.FileId)
+		err := c.DeleteFile(log.FileId)
 		if err != nil {
 			return err
 		}

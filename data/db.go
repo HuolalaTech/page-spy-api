@@ -63,7 +63,7 @@ func InitData(config *gorm.Config) (*Data, error) {
 		return nil, fmt.Errorf("failed to connect database")
 	}
 
-	if err := db.AutoMigrate(&LogData{}, &Tag{}); err != nil {
+	if err := db.AutoMigrate(&LogData{}, &LogGroup{}, &Tag{}); err != nil {
 		return nil, fmt.Errorf("failed to auto migrate database")
 	}
 
@@ -194,7 +194,7 @@ func (d *Data) CreateLogGroup(groupLog *LogGroup) error {
 
 func (d *Data) FindLogGroup(groupId string) (*LogGroup, error) {
 	logGroup := &LogGroup{}
-	result := d.db.Where("group_id = ?", groupId).First(logGroup)
+	result := d.db.Where("group_id = ?", groupId).Preload("Logs").First(logGroup)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -213,13 +213,13 @@ func (d *Data) FindLogGroups(query *FileListQuery) (*Page[*LogGroup], error) {
 
 	var logGroups []*LogGroup
 	offset := query.GetOffset()
-	result := query.getGroupLogDB(d.db).Offset(offset).Limit(query.Size).Find(&logGroups)
+	result := query.getLogGroupDB(d.db).Offset(offset).Limit(query.Size).Find(&logGroups)
 	if result.Error != nil {
 		return nil, result.Error
 	}
 
 	var total int64
-	result = query.getLogDB(d.db).Model(&LogGroup{}).Count(&total)
+	result = query.getLogGroupDB(d.db).Model(&LogGroup{}).Count(&total)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -291,28 +291,28 @@ func (f *FileListQuery) GetTo() *time.Time {
 	return &to
 }
 
-func (query *FileListQuery) getGroupLogDB(db *gorm.DB) *gorm.DB {
+func (query *FileListQuery) getLogGroupDB(db *gorm.DB) *gorm.DB {
 	q := db
 	if query.Tags != nil && len(query.Tags) > 0 {
 		for i, tag := range query.Tags {
 			logTagName := fmt.Sprintf("log_group_tag%d", i)
 			tagName := fmt.Sprintf("tag%d", i)
-			q = q.Joins(fmt.Sprintf("join log_group_tags as %s on %s.log_group_id = log_group.id", logTagName, logTagName)).
+			q = q.Joins(fmt.Sprintf("join log_group_tags as %s on %s.log_group_id = log_groups.id", logTagName, logTagName)).
 				Joins(fmt.Sprintf("join tags as %s on %s.id = %s.tag_id and %s.key = ? and %s.value like ?", tagName, tagName, logTagName, tagName, tagName), tag.Key, "%"+tag.Value+"%")
 		}
 	}
 
 	from := query.GetFrom()
 	if from != nil {
-		q = q.Where("log_group.created_at > ?", from)
+		q = q.Where("log_groups.created_at > ?", from)
 	}
 
 	to := query.GetTo()
 	if to != nil {
-		q = q.Where("log_group.created_at < ?", to)
+		q = q.Where("log_groups.created_at < ?", to)
 	}
 
-	return q.Preload("Tags").Preload("Logs").Order("log_group.created_at desc")
+	return q.Preload("Tags").Preload("Logs").Order("log_groups.created_at desc")
 }
 
 func (query *FileListQuery) getLogDB(db *gorm.DB) *gorm.DB {
