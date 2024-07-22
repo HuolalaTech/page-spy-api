@@ -23,7 +23,7 @@ type LogFile struct {
 }
 
 type LogGroupFile struct {
-	*LogFile
+	LogFile
 	GroupId   string `json:"groupId"`
 	GroupName string `json:"groupName"`
 }

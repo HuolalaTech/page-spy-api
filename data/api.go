@@ -3,10 +3,10 @@ package data
 import "time"
 
 type DataApi interface {
-	CreateGroupLog(groupLog *LogGroup) error
-	UpdateGroupLog(groupLog *LogGroup) error
-	FindGroupLog(groupId string) (*LogGroup, error)
-	FindGroupLogs(query *FileListQuery) (*Page[*LogGroup], error)
+	CreateLogGroup(logGroup *LogGroup) error
+	UpdateLogGroup(logGroup *LogGroup) error
+	FindLogGroup(groupId string) (*LogGroup, error)
+	FindLogGroups(query *FileListQuery) (*Page[*LogGroup], error)
 	DeleteLogGroupByGroupId(groupId string) error
 
 	CreateLog(log *LogData) error

@@ -94,10 +94,10 @@ func (c *CoreApi) CreateFile(file *storage.LogFile) (*storage.LogFile, error) {
 	return file, err
 }
 
-func (c *CoreApi) CreateGroupFile(file *storage.LogGroupFile) (*storage.LogGroupFile, error) {
+func (c *CoreApi) CreateLogGroupFile(file *storage.LogGroupFile) (*storage.LogGroupFile, error) {
 	file.FileId = c.CreateFileId(util.MD5(file.UpdateFile))
 
-	err := c.storage.SaveLog(file.LogFile)
+	err := c.storage.SaveLog(&file.LogFile)
 	if err != nil {
 		return file, err
 	}
@@ -122,7 +122,7 @@ func (c *CoreApi) CreateGroupFile(file *storage.LogGroupFile) (*storage.LogGroup
 		Name:   file.Name,
 	}
 
-	logGroup, err := c.data.FindGroupLog(file.GroupId)
+	logGroup, err := c.data.FindLogGroup(file.GroupId)
 	if err != nil {
 		return nil, err
 	}
@@ -139,13 +139,14 @@ func (c *CoreApi) CreateGroupFile(file *storage.LogGroupFile) (*storage.LogGroup
 			Logs:    []*data.LogData{log},
 			Name:    file.GroupName,
 		}
+		err = c.data.CreateLogGroup(logGroup)
 		return file, err
 	}
 
 	logGroup.Size = logGroup.Size + file.Size
 	logGroup.Logs = append(logGroup.Logs, log)
 
-	err = c.data.UpdateGroupLog(logGroup)
+	err = c.data.UpdateLogGroup(logGroup)
 
 	if err != nil {
 		return nil, err
@@ -154,8 +155,40 @@ func (c *CoreApi) CreateGroupFile(file *storage.LogGroupFile) (*storage.LogGroup
 	return file, err
 }
 
+func (c *CoreApi) DeleteLogGroup(groupId string) error {
+	logGroup, err := c.data.FindLogGroup(groupId)
+	if err != nil {
+		return err
+	}
+
+	for _, log := range logGroup.Logs {
+		err := c.storage.RemoveLog(log.FileId)
+		if err != nil {
+			return err
+		}
+	}
+
+	return c.data.DeleteLogGroupByGroupId(groupId)
+}
+
 func (c *CoreApi) getFileList(query *data.FileListQuery) (*data.Page[*data.LogData], error) {
 	return c.data.FindLogs(query)
+}
+
+func (c *CoreApi) getFileGroupList(query *data.FileListQuery) (*data.Page[*data.LogGroup], error) {
+	return c.data.FindLogGroups(query)
+}
+
+func (c *CoreApi) GetLogGroupList(query *data.FileListQuery) (*data.Page[*data.LogGroup], error) {
+	res := &data.Page[*data.LogGroup]{}
+	err := rpc.CallAllClient(c.rpcManager, context.Background(), "CoreApi.FindLogGroups", query, res)
+
+	if err != nil {
+		return nil, err
+	}
+
+	res.Desc()
+	return res, nil
 }
 
 func (c *CoreApi) GetFileList(query *data.FileListQuery) (*data.Page[*data.LogData], error) {
@@ -300,6 +333,16 @@ func NewRpcCore(coreApi *CoreApi) *RcpCoreApi {
 
 func (r *RcpCoreApi) FindLogs(_ *http.Request, req *data.FileListQuery, res *data.Page[*data.LogData]) error {
 	page, err := r.core.getFileList(req)
+	if err != nil {
+		return err
+	}
+	res.Data = page.Data
+	res.Total = page.Total
+	return nil
+}
+
+func (r *RcpCoreApi) FindLogGroups(_ *http.Request, req *data.FileListQuery, res *data.Page[*data.LogGroup]) error {
+	page, err := r.core.getFileGroupList(req)
 	if err != nil {
 		return err
 	}

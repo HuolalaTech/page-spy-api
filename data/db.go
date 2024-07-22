@@ -178,7 +178,7 @@ func syncData(config *config.Config, s storage.StorageApi) func() error {
 	}
 }
 
-func (d *Data) UpdateGroupLog(groupLog *LogGroup) error {
+func (d *Data) UpdateLogGroup(groupLog *LogGroup) error {
 	result := d.db.Model(groupLog).Updates(&LogGroup{
 		Size: groupLog.Size,
 		Logs: groupLog.Logs,
@@ -187,12 +187,12 @@ func (d *Data) UpdateGroupLog(groupLog *LogGroup) error {
 	return result.Error
 }
 
-func (d *Data) CreateGroupLog(groupLog *LogGroup) error {
+func (d *Data) CreateLogGroup(groupLog *LogGroup) error {
 	result := d.db.Create(groupLog)
 	return result.Error
 }
 
-func (d *Data) FindGroupLog(groupId string) (*LogGroup, error) {
+func (d *Data) FindLogGroup(groupId string) (*LogGroup, error) {
 	logGroup := &LogGroup{}
 	result := d.db.Where("group_id = ?", groupId).First(logGroup)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -202,7 +202,7 @@ func (d *Data) FindGroupLog(groupId string) (*LogGroup, error) {
 	return logGroup, result.Error
 }
 
-func (d *Data) FindGroupLogs(query *FileListQuery) (*Page[*LogGroup], error) {
+func (d *Data) FindLogGroups(query *FileListQuery) (*Page[*LogGroup], error) {
 	if query.Size <= 0 {
 		return nil, fmt.Errorf("size should be greater than 0")
 	}
@@ -231,7 +231,7 @@ func (d *Data) FindGroupLogs(query *FileListQuery) (*Page[*LogGroup], error) {
 }
 
 func (d *Data) DeleteLogGroupByGroupId(groupId string) error {
-	logGroup, err := d.FindGroupLog(groupId)
+	logGroup, err := d.FindLogGroup(groupId)
 	if err != nil {
 		return err
 	}
