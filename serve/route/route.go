@@ -180,7 +180,7 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 			return fmt.Errorf("not allowed delete log")
 		}
 
-		fileIds := strings.Split(c.QueryParam("fileId"), ",")
+		fileIds := c.QueryParams()["fileId"]
 		for _, fileId := range fileIds {
 			machine, err := core.GetMachineIdByFileName(fileId)
 			if err != nil {
@@ -204,7 +204,7 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 			return fmt.Errorf("not allowed delete log")
 		}
 
-		groupIds := strings.Split(c.QueryParam("groupId"), ",")
+		groupIds := c.QueryParams()["groupId"]
 		for _, groupId := range groupIds {
 			err := core.DeleteLogGroup(groupId)
 			if err != nil {
