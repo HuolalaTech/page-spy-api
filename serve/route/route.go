@@ -180,18 +180,20 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 			return fmt.Errorf("not allowed delete log")
 		}
 
-		fileId := c.QueryParam("fileId")
-		machine, err := core.GetMachineIdByFileName(fileId)
-		if err != nil {
-			return err
-		}
-		if !core.IsSelfMachine(machine) {
-			return proxyManager.Proxy(machine, c)
-		}
+		fileIds := c.QueryParams()["fileId"]
+		for _, fileId := range fileIds {
+			machine, err := core.GetMachineIdByFileName(fileId)
+			if err != nil {
+				return err
+			}
+			if !core.IsSelfMachine(machine) {
+				return proxyManager.Proxy(machine, c)
+			}
 
-		err = core.DeleteFile(fileId)
-		if err != nil {
-			return err
+			err = core.DeleteFile(fileId)
+			if err != nil {
+				return err
+			}
 		}
 
 		return c.JSON(200, common.NewSuccessResponse(true))
@@ -202,10 +204,13 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 			return fmt.Errorf("not allowed delete log")
 		}
 
-		groupId := c.QueryParam("groupId")
-		err := core.DeleteLogGroup(groupId)
-		if err != nil {
-			return err
+		groupIds := c.QueryParams()["groupId"]
+		for _, groupId := range groupIds {
+			err := core.DeleteLogGroup(groupId)
+			if err != nil {
+				return err
+			}
+
 		}
 
 		return c.JSON(200, common.NewSuccessResponse(true))
