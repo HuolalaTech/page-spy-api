@@ -55,15 +55,25 @@ type Model struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-type LogData struct {
-	Model
-	Status Status `json:"status"`
-	Size   int64  `json:"size"`
-	FileId string `gorm:"index:unique" json:"fileId"`
-	Tags   []*Tag `gorm:"many2many:log_tags;" json:"tags"`
-	Name   string `json:"name"`
+func (m *Model) GetOrderValue() float64 {
+	return float64(m.CreatedAt.Unix())
 }
 
-func (l *LogData) GetOrderValue() float64 {
-	return float64(l.CreatedAt.Unix())
+type LogData struct {
+	Model
+	Status     Status `json:"status"`
+	Size       int64  `json:"size"`
+	FileId     string `gorm:"index:unique" json:"fileId"`
+	LogGroupID uint   `json:"-"`
+	Tags       []*Tag `gorm:"many2many:log_tags;" json:"tags"`
+	Name       string `json:"name"`
+}
+
+type LogGroup struct {
+	Model
+	GroupId string     `json:"groupId"`
+	Tags    []*Tag     `gorm:"many2many:log_group_tags;" json:"tags"`
+	Size    int64      `json:"size"`
+	Logs    []*LogData `gorm:"foreignKey:LogGroupID" json:"logs"`
+	Name    string     `json:"name"`
 }

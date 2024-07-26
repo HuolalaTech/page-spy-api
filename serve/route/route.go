@@ -45,6 +45,53 @@ func getTags(params url.Values) []*storage.Tag {
 	return tags
 }
 
+func getQueryList(c echo.Context) (*data.FileListQuery, error) {
+	page := c.QueryParam("page")
+	size := c.QueryParam("size")
+	if page == "" || size == "" {
+		return nil, fmt.Errorf("find logs need page and size")
+	}
+
+	pageNum, err := strconv.Atoi(page)
+	if err != nil {
+		return nil, err
+	}
+
+	sizeNum, err := strconv.Atoi(size)
+	if err != nil {
+		return nil, err
+	}
+
+	query := &data.FileListQuery{
+		PageQuery: data.PageQuery{
+			Size: sizeNum,
+			Page: pageNum,
+		},
+		Tags: getTags(c.QueryParams()),
+	}
+
+	fromString := c.QueryParam("from")
+	if fromString != "" {
+		fromStringUnix, err := strconv.ParseInt(fromString, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("from time format error %w", err)
+		}
+		query.From = &fromStringUnix
+	}
+
+	toString := c.QueryParam("to")
+
+	if toString != "" {
+		toStringUnix, err := strconv.ParseInt(toString, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("to time format error %w", err)
+		}
+
+		query.To = &toStringUnix
+	}
+	return query, nil
+}
+
 func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, proxyManager *proxy.ProxyManager, staticConfig *config.StaticConfig) *echo.Echo {
 	e := echo.New()
 	e.Use(selfMiddleware.Logger())
@@ -100,49 +147,24 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return nil
 	})
 
+	route.GET("/logGroup/list", func(c echo.Context) error {
+		query, err := getQueryList(c)
+		if err != nil {
+			return err
+		}
+
+		logGroups, err := core.GetLogGroupList(query)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(200, common.NewSuccessResponse(logGroups))
+	})
+
 	route.GET("/log/list", func(c echo.Context) error {
-		page := c.QueryParam("page")
-		size := c.QueryParam("size")
-		if page == "" || size == "" {
-			return fmt.Errorf("find logs need page and size")
-		}
-
-		pageNum, err := strconv.Atoi(page)
+		query, err := getQueryList(c)
 		if err != nil {
 			return err
-		}
-
-		sizeNum, err := strconv.Atoi(size)
-		if err != nil {
-			return err
-		}
-
-		query := &data.FileListQuery{
-			PageQuery: data.PageQuery{
-				Size: sizeNum,
-				Page: pageNum,
-			},
-			Tags: getTags(c.QueryParams()),
-		}
-
-		fromString := c.QueryParam("from")
-		if fromString != "" {
-			fromStringUnix, err := strconv.ParseInt(fromString, 10, 64)
-			if err != nil {
-				return fmt.Errorf("from time format error %w", err)
-			}
-			query.From = &fromStringUnix
-		}
-
-		toString := c.QueryParam("to")
-
-		if toString != "" {
-			toStringUnix, err := strconv.ParseInt(toString, 10, 64)
-			if err != nil {
-				return fmt.Errorf("to time format error %w", err)
-			}
-
-			query.To = &toStringUnix
 		}
 
 		logs, err := core.GetFileList(query)
@@ -158,21 +180,83 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 			return fmt.Errorf("not allowed delete log")
 		}
 
-		fileId := c.QueryParam("fileId")
-		machine, err := core.GetMachineIdByFileName(fileId)
-		if err != nil {
-			return err
-		}
-		if !core.IsSelfMachine(machine) {
-			return proxyManager.Proxy(machine, c)
-		}
+		fileIds := c.QueryParams()["fileId"]
+		for _, fileId := range fileIds {
+			machine, err := core.GetMachineIdByFileName(fileId)
+			if err != nil {
+				return err
+			}
+			if !core.IsSelfMachine(machine) {
+				return proxyManager.Proxy(machine, c)
+			}
 
-		err = core.DeleteFile(fileId)
-		if err != nil {
-			return err
+			err = core.DeleteFile(fileId)
+			if err != nil {
+				return err
+			}
 		}
 
 		return c.JSON(200, common.NewSuccessResponse(true))
+	})
+
+	route.DELETE("/logGroup/delete", func(c echo.Context) error {
+		if config.NotAllowedDeleteLog {
+			return fmt.Errorf("not allowed delete log")
+		}
+
+		groupIds := c.QueryParams()["groupId"]
+		for _, groupId := range groupIds {
+			err := core.DeleteLogGroup(groupId)
+			if err != nil {
+				return err
+			}
+
+		}
+
+		return c.JSON(200, common.NewSuccessResponse(true))
+	})
+
+	route.POST("/logGroup/upload", func(c echo.Context) error {
+		file, err := c.FormFile("log")
+		if err != nil {
+			return err
+		}
+
+		src, err := file.Open()
+		if err != nil {
+			return fmt.Errorf("open upload file error: %w", err)
+		}
+
+		defer src.Close()
+		fileBs, err := io.ReadAll(src)
+		if err != nil {
+			return fmt.Errorf("read upload file error: %w", err)
+		}
+		ts := getTags(c.QueryParams())
+
+		groupId := c.QueryParam("groupId")
+		groupName := c.QueryParam("groupName")
+		if groupId == "" || groupName == "" {
+			return fmt.Errorf("groupId and groupName is required")
+		}
+
+		logFile := &storage.LogGroupFile{
+			LogFile: storage.LogFile{
+				Tags:       ts,
+				Name:       file.Filename,
+				Size:       file.Size,
+				UpdateFile: fileBs,
+			},
+			GroupId:   groupId,
+			GroupName: groupName,
+		}
+
+		createFile, err := core.CreateLogGroupFile(logFile)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(200, common.NewSuccessResponse(createFile))
 	})
 
 	route.POST("/log/upload", func(c echo.Context) error {

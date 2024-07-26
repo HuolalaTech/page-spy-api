@@ -63,7 +63,7 @@ func InitData(config *gorm.Config) (*Data, error) {
 		return nil, fmt.Errorf("failed to connect database")
 	}
 
-	if err := db.AutoMigrate(&LogData{}, &Tag{}); err != nil {
+	if err := db.AutoMigrate(&LogData{}, &LogGroup{}, &Tag{}); err != nil {
 		return nil, fmt.Errorf("failed to auto migrate database")
 	}
 
@@ -178,6 +178,68 @@ func syncData(config *config.Config, s storage.StorageApi) func() error {
 	}
 }
 
+func (d *Data) UpdateLogGroup(groupLog *LogGroup) error {
+	result := d.db.Model(groupLog).Updates(&LogGroup{
+		Size: groupLog.Size,
+		Logs: groupLog.Logs,
+	})
+
+	return result.Error
+}
+
+func (d *Data) CreateLogGroup(groupLog *LogGroup) error {
+	result := d.db.Create(groupLog)
+	return result.Error
+}
+
+func (d *Data) FindLogGroup(groupId string) (*LogGroup, error) {
+	logGroup := &LogGroup{}
+	result := d.db.Where("group_id = ?", groupId).Preload("Logs").First(logGroup)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+
+	return logGroup, result.Error
+}
+
+func (d *Data) FindLogGroups(query *FileListQuery) (*Page[*LogGroup], error) {
+	if query.Size <= 0 {
+		return nil, fmt.Errorf("size should be greater than 0")
+	}
+
+	if query.Page <= 0 {
+		return nil, fmt.Errorf("page should be greater than 0")
+	}
+
+	var logGroups []*LogGroup
+	offset := query.GetOffset()
+	result := query.getLogGroupDB(d.db).Offset(offset).Limit(query.Size).Find(&logGroups)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	var total int64
+	result = query.getLogGroupDB(d.db).Model(&LogGroup{}).Count(&total)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return &Page[*LogGroup]{
+		Data:  logGroups,
+		Total: total,
+	}, nil
+}
+
+func (d *Data) DeleteLogGroupByGroupId(groupId string) error {
+	logGroup, err := d.FindLogGroup(groupId)
+	if err != nil {
+		return err
+	}
+
+	result := d.db.Delete(logGroup)
+	return result.Error
+}
+
 func (d *Data) CreateLog(log *LogData) error {
 	findFile, err := d.FindLogByFileId(log.FileId)
 
@@ -229,7 +291,31 @@ func (f *FileListQuery) GetTo() *time.Time {
 	return &to
 }
 
-func (query *FileListQuery) getDB(db *gorm.DB) *gorm.DB {
+func (query *FileListQuery) getLogGroupDB(db *gorm.DB) *gorm.DB {
+	q := db
+	if query.Tags != nil && len(query.Tags) > 0 {
+		for i, tag := range query.Tags {
+			logTagName := fmt.Sprintf("log_group_tag%d", i)
+			tagName := fmt.Sprintf("tag%d", i)
+			q = q.Joins(fmt.Sprintf("join log_group_tags as %s on %s.log_group_id = log_groups.id", logTagName, logTagName)).
+				Joins(fmt.Sprintf("join tags as %s on %s.id = %s.tag_id and %s.key = ? and %s.value like ?", tagName, tagName, logTagName, tagName, tagName), tag.Key, "%"+tag.Value+"%")
+		}
+	}
+
+	from := query.GetFrom()
+	if from != nil {
+		q = q.Where("log_groups.created_at > ?", from)
+	}
+
+	to := query.GetTo()
+	if to != nil {
+		q = q.Where("log_groups.created_at < ?", to)
+	}
+
+	return q.Preload("Tags").Preload("Logs").Order("log_groups.created_at desc")
+}
+
+func (query *FileListQuery) getLogDB(db *gorm.DB) *gorm.DB {
 	q := db
 
 	if query.Tags != nil && len(query.Tags) > 0 {
@@ -265,13 +351,13 @@ func (d *Data) FindLogs(query *FileListQuery) (*Page[*LogData], error) {
 
 	var logs []*LogData
 	offset := query.GetOffset()
-	result := query.getDB(d.db).Offset(offset).Limit(query.Size).Find(&logs)
+	result := query.getLogDB(d.db).Offset(offset).Limit(query.Size).Find(&logs)
 	if result.Error != nil {
 		return nil, result.Error
 	}
 
 	var total int64
-	result = query.getDB(d.db).Model(&LogData{}).Count(&total)
+	result = query.getLogDB(d.db).Model(&LogData{}).Count(&total)
 	if result.Error != nil {
 		return nil, result.Error
 	}
