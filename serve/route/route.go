@@ -161,6 +161,20 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return c.JSON(200, common.NewSuccessResponse(logGroups))
 	})
 
+	route.GET("/logGroup/files", func(c echo.Context) error {
+		groupId := c.QueryParam("groupId")
+		if groupId == "" {
+			return fmt.Errorf("groupId is required")
+		}
+
+		logFiles, err := core.ListFilesInGroup(groupId)
+
+		if err != nil {
+			return err
+		}
+		return c.JSON(200, common.NewSuccessResponse(logFiles))
+	})
+
 	route.GET("/log/list", func(c echo.Context) error {
 		query, err := getQueryList(c)
 		if err != nil {
@@ -235,9 +249,8 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		ts := getTags(c.QueryParams())
 
 		groupId := c.QueryParam("groupId")
-		groupName := c.QueryParam("groupName")
-		if groupId == "" || groupName == "" {
-			return fmt.Errorf("groupId and groupName is required")
+		if groupId == "" {
+			return fmt.Errorf("groupId is required")
 		}
 
 		logFile := &storage.LogGroupFile{
@@ -247,8 +260,7 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 				Size:       file.Size,
 				UpdateFile: fileBs,
 			},
-			GroupId:   groupId,
-			GroupName: groupName,
+			GroupId: groupId,
 		}
 
 		createFile, err := core.CreateLogGroupFile(logFile)
