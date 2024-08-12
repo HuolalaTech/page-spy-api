@@ -24,8 +24,7 @@ type LogFile struct {
 
 type LogGroupFile struct {
 	LogFile
-	GroupId   string `json:"groupId"`
-	GroupName string `json:"groupName"`
+	GroupId string `json:"groupId"`
 }
 
 type StorageApi interface {

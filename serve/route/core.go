@@ -137,7 +137,7 @@ func (c *CoreApi) CreateLogGroupFile(file *storage.LogGroupFile) (*storage.LogGr
 			Tags:    ts,
 			Size:    file.Size,
 			Logs:    []*data.LogData{log},
-			Name:    file.GroupName,
+			Name:    file.Name,
 		}
 		err = c.data.CreateLogGroup(logGroup)
 		return file, err
@@ -193,6 +193,15 @@ func (c *CoreApi) GetLogGroupList(query *data.FileListQuery) (*data.Page[*data.L
 
 	res.Desc()
 	return res, nil
+}
+
+func (c *CoreApi) ListFilesInGroup(groupId string) ([]*data.LogData, error) {
+	logGroup, err := c.data.FindLogGroup(groupId)
+	if err != nil {
+		return nil, err
+	}
+
+	return logGroup.Logs, nil
 }
 
 func (c *CoreApi) GetFileList(query *data.FileListQuery) (*data.Page[*data.LogData], error) {
