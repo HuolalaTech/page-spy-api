@@ -1,5 +1,6 @@
 [main-repo]: https://github.com/HuolalaTech/page-spy-web
 [license-img]: https://img.shields.io/github/license/HuolalaTech/page-spy-api?label=License
+[license-url]: https://github.com/HuolalaTech/page-spy-api/blob/main/LICENSE
 [api-ver-img]: https://img.shields.io/github/v/tag/HuolalaTech/page-spy-api?label=version
 [api-ver-url]: https://github.com/HuolalaTech/page-spy-api/tags
 [api-go-img]: https://img.shields.io/github/go-mod/go-version/HuolalaTech/page-spy-api?label=go
