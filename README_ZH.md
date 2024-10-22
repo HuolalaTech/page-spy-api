@@ -1,4 +1,5 @@
 [main-repo]: https://github.com/HuolalaTech/page-spy-web
+[license-img]: https://img.shields.io/github/license/HuolalaTech/page-spy-api?label=License
 [api-ver-img]: https://img.shields.io/github/v/tag/HuolalaTech/page-spy-api?label=version
 [api-ver-url]: https://github.com/HuolalaTech/page-spy-api/tags
 [api-go-img]: https://img.shields.io/github/go-mod/go-version/HuolalaTech/page-spy-api?label=go
@@ -10,6 +11,7 @@
 <h1>Page Spy API</h1>
 <p>PageSpy 是一款远程调试网页的工具。</p>
 
+[![license][license-img]][license-url]
 [![API Version][api-ver-img]][api-ver-url]
 [![Go Version][api-go-img]][api-go-url]
 
