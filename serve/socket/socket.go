@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"runtime/debug"
-	"strings"
 	"sync"
 	"time"
 
@@ -277,7 +276,7 @@ type ListRoomParams struct {
 }
 
 func (s *WebSocket) ListRooms(rw http.ResponseWriter, r *http.Request) {
-	tags := getTags(r.URL.Query(), "")
+	tags := getTags(r.URL.Query())
 	rooms, err := s.roomManager.ListRooms(r.Context(), tags)
 	if err != nil {
 		writeResponse(rw, common.NewErrorResponse(err))
@@ -287,19 +286,12 @@ func (s *WebSocket) ListRooms(rw http.ResponseWriter, r *http.Request) {
 	writeResponse(rw, common.NewSuccessResponse(rooms))
 }
 
-func getTags(query url.Values, prefix string) map[string]string {
+func getTags(query url.Values) map[string]string {
 	tags := make(map[string]string, len(query))
 	for k, v := range query {
 		if len(v) > 0 {
 			value := v[0]
-			if prefix != "" {
-				if strings.HasPrefix(k, prefix) {
-					tags[k[len(prefix):]] = value
-				}
-
-			} else {
-				tags[k] = value
-			}
+			tags[k] = value
 		}
 	}
 
@@ -315,7 +307,7 @@ func (s *WebSocket) CreateRoom(rw http.ResponseWriter, r *http.Request) {
 	address := s.roomManager.AddressManager.GeneratorRoomAddress()
 	name := r.URL.Query().Get("name")
 	group := r.URL.Query().Get("group")
-	tags := getTags(r.URL.Query(), "")
+	tags := getTags(r.URL.Query())
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {

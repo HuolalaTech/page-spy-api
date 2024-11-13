@@ -20,7 +20,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-var TagName = []string{"project", "title", "deviceId", "userAgent"}
+var blackTagName = []string{"page", "size", "from", "to"}
 
 func include(arr []string, value string) bool {
 	for _, v := range arr {
@@ -34,7 +34,7 @@ func include(arr []string, value string) bool {
 func getTags(params url.Values) []*storage.Tag {
 	tags := []*storage.Tag{}
 	for k, v := range params {
-		if include(TagName, k) {
+		if !include(blackTagName, k) {
 			tags = append(tags, &storage.Tag{
 				Key:   k,
 				Value: strings.Join(v, " "),
