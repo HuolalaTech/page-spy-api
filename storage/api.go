@@ -30,6 +30,7 @@ type LogGroupFile struct {
 type StorageApi interface {
 	SaveLog(log *LogFile) error
 	GetLog(fileId string) (*LogFile, error)
+	ExistLog(fileId string) (bool, error)
 	RemoveLog(fileId string) error
 }
 
