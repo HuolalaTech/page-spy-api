@@ -34,6 +34,25 @@ func (f *FileApi) SaveLog(log *LogFile) error {
 	return nil
 }
 
+func (f *FileApi) ExistLog(fileId string) (bool, error) {
+	if fileId == "" {
+		return false, fmt.Errorf("get log file error: fileId is empty")
+	}
+
+	logFilePath := fmt.Sprintf("%s/%s", logDirPath, fileId)
+
+	_, err := os.Stat(logFilePath)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, fmt.Errorf("get file size error: %w", err)
+	}
+
+	return true, nil
+}
+
 func (f *FileApi) GetLog(fileId string) (*LogFile, error) {
 	if fileId == "" {
 		return nil, fmt.Errorf("get log file error: fileId is empty")
