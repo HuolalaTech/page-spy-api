@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -41,7 +42,15 @@ func (f *FileApi) ExistLog(fileId string) (bool, error) {
 
 	logFilePath := fmt.Sprintf("%s/%s", logDirPath, fileId)
 
-	_, err := os.Stat(logFilePath)
+	return f.Exist(logFilePath)
+}
+
+func (f *FileApi) Exist(path string) (bool, error) {
+	if path == "" {
+		return false, fmt.Errorf("get path error: path is empty")
+	}
+
+	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return false, nil
 	}
@@ -60,21 +69,30 @@ func (f *FileApi) GetLog(fileId string) (*LogFile, error) {
 
 	logFilePath := fmt.Sprintf("%s/%s", logDirPath, fileId)
 
-	fileInfo, err := os.Stat(logFilePath)
+	fileSteam, fileSize, err := f.Get(logFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("get file size error: %w", err)
-	}
-
-	fileSteam, err := os.Open(logFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("open log file error: %w", err)
+		return nil, err
 	}
 
 	return &LogFile{
 		FileId:    fileId,
-		Size:      fileInfo.Size(),
+		Size:      fileSize,
 		FileSteam: fileSteam,
 	}, nil
+}
+
+func (f *FileApi) Get(path string) (io.ReadCloser, int64, error) {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return nil, 0, fmt.Errorf("get file size error: %w", err)
+	}
+
+	fileSteam, err := os.Open(path)
+	if err != nil {
+		return nil, 0, fmt.Errorf("open log file error: %w", err)
+	}
+
+	return fileSteam, fileInfo.Size(), nil
 }
 
 func (f *FileApi) RemoveLog(fileId string) error {

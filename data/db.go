@@ -107,7 +107,7 @@ func NewData(config *config.Config, taskManager *task.TaskManager, storage stora
 	return InitData(c)
 }
 
-func loadData(config *config.Config, s storage.StorageApi) error {
+func loadData(config *config.Config, remoteStorage storage.StorageApi) error {
 	filePath := getLocalDataFilePath()
 	if util.FileExists(filePath) {
 		logger.Infof("load data already exists")
@@ -115,7 +115,6 @@ func loadData(config *config.Config, s storage.StorageApi) error {
 	}
 
 	remotePath := path.Join(config.StorageConfig.BaseDir, filePath)
-	remoteStorage := s.(*storage.RemoteApi)
 	exist, err := remoteStorage.Exist(remotePath)
 	if err != nil {
 		return fmt.Errorf("failed to head remote data file %s", err.Error())
