@@ -32,6 +32,9 @@ type StorageApi interface {
 	GetLog(fileId string) (*LogFile, error)
 	ExistLog(fileId string) (bool, error)
 	RemoveLog(fileId string) error
+
+	Exist(path string) (bool, error)
+	Get(path string) (io.ReadCloser, int64, error)
 }
 
 func NewStorage(config *config.Config) (StorageApi, error) {
