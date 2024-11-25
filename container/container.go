@@ -2,6 +2,7 @@ package container
 
 import (
 	"log"
+	"sync"
 
 	"github.com/HuolalaTech/page-spy-api/config"
 	"github.com/HuolalaTech/page-spy-api/data"
@@ -14,7 +15,7 @@ import (
 	"go.uber.org/dig"
 )
 
-func initContainer() (*dig.Container, error) {
+func InitContainer() (*dig.Container, error) {
 	container := dig.New()
 	err := container.Provide(config.LoadConfig)
 	if err != nil {
@@ -71,13 +72,25 @@ func initContainer() (*dig.Container, error) {
 
 var container *dig.Container
 
+var once sync.Once
+
 func Container() *dig.Container {
+	if container == nil {
+		once.Do(func() {
+			InitDefault()
+		})
+	}
+
 	return container
 }
 
-func init() {
+func SetContainer(c *dig.Container) {
+	container = c
+}
+
+func InitDefault() {
 	var err error
-	container, err = initContainer()
+	container, err = InitContainer()
 	if err != nil {
 		log.Fatal(err)
 	}
