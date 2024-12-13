@@ -339,6 +339,26 @@ func (query *FileListQuery) getLogDB(db *gorm.DB) *gorm.DB {
 	return q.Preload("Tags").Order("log_data.created_at desc")
 }
 
+type LogGroupResult struct {
+	Date  string `json:"date"`
+	Tag   string `json:"tag"`
+	Total int64  `json:"total"`
+}
+
+func (d *Data) CountLogsGroup(tagKey string) ([]LogGroupResult, error) {
+	var results []LogGroupResult
+	err := d.db.Model(&LogData{}).
+		Select("strftime('%Y-%m', log_data.created_at) as date, tags.value as tag, count(*) as total").
+		Joins("JOIN log_tags ON log_data.id = log_tags.log_data_id").
+		Joins("JOIN tags ON tags.id = log_tags.tag_id").
+		Where("tags.key = ?", tagKey).
+		Group("strftime('%Y-%m', log_data.created_at), tags.value").
+		Order("date").
+		Find(&results).Error
+
+	return results, err
+}
+
 func (d *Data) FindLogs(query *FileListQuery) (*Page[*LogData], error) {
 	if query.Size <= 0 {
 		return nil, fmt.Errorf("size should be greater than 0")
