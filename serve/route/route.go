@@ -120,6 +120,16 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return nil
 	})
 
+	route.GET("/log/count", func(c echo.Context) error {
+		key := c.QueryParam("key")
+		result, err := core.data.CountLogsGroup(key)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(200, common.NewSuccessResponse(result))
+	})
+
 	route.GET("/log/download", func(c echo.Context) error {
 		fileId := c.QueryParam("fileId")
 		machine, err := core.GetMachineIdByFileName(fileId)
