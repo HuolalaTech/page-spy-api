@@ -281,6 +281,28 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return c.JSON(200, common.NewSuccessResponse(createFile))
 	})
 
+	route.POST("/jsonLog/upload", func(c echo.Context) error {
+		fileName := c.QueryParam("name")
+		body, err := io.ReadAll(c.Request().Body)
+		if err != nil {
+			return fmt.Errorf("open upload file error: %w", err)
+		}
+
+		logFile := &storage.LogFile{
+			Tags:       getTags(c.QueryParams()),
+			Name:       fileName,
+			Size:       int64(len(body)),
+			UpdateFile: body,
+		}
+
+		createFile, err := core.CreateFile(logFile)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(200, common.NewSuccessResponse(createFile))
+	})
+
 	route.POST("/log/upload", func(c echo.Context) error {
 		file, err := c.FormFile("log")
 		if err != nil {
