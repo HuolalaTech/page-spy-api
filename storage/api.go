@@ -33,6 +33,7 @@ type StorageApi interface {
 	ExistLog(fileId string) (bool, error)
 	RemoveLog(fileId string) error
 
+	Save(path string, data io.ReadSeeker) error
 	Exist(path string) (bool, error)
 	Get(path string) (io.ReadCloser, int64, error)
 }

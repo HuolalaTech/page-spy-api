@@ -81,6 +81,30 @@ func (f *FileApi) GetLog(fileId string) (*LogFile, error) {
 	}, nil
 }
 
+func (f *FileApi) Save(path string, stream io.ReadSeeker) error {
+	findFile, err := os.Stat(path)
+	if err == nil && findFile != nil {
+		return nil
+	}
+
+	dst, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("create log file error: %w", err)
+	}
+
+	data, err := io.ReadAll(stream)
+	if err != nil {
+		return err
+	}
+
+	defer dst.Close()
+	if _, err = dst.Write(data); err != nil {
+		return fmt.Errorf("create log file error: %w", err)
+	}
+
+	return nil
+}
+
 func (f *FileApi) Get(path string) (io.ReadCloser, int64, error) {
 	fileInfo, err := os.Stat(path)
 	if err != nil {
