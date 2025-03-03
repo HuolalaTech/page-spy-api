@@ -167,8 +167,7 @@ func syncData(config *config.Config, s storage.StorageApi) func() error {
 		}
 
 		remotePath := path.Join(config.StorageConfig.BaseDir, filePath)
-		remoteStorage := s.(*storage.RemoteApi)
-		err = remoteStorage.Save(remotePath, bytes.NewReader(content))
+		err = s.Save(remotePath, bytes.NewReader(content))
 		if err != nil {
 			return err
 		}
