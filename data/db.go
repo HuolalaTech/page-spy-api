@@ -70,17 +70,18 @@ func InitData(config *gorm.Config) (*Data, error) {
 	return &Data{db: db}, nil
 }
 
-func NewData(config *config.Config, taskManager *task.TaskManager, storage storage.StorageApi) (DataApi, error) {
-	if config.IsRemoteStorage() {
+func NewData(config *config.Config, taskManager *task.TaskManager, st storage.StorageApi) (DataApi, error) {
+	_, isLocalStorage := st.(*storage.FileApi)
+	if !isLocalStorage {
 		logger.Infof("init database with remote storage")
-		err := loadData(config, storage)
+		err := loadData(config, st)
 		if err != nil {
 			logger.Infof("load remote data error %s", err.Error())
 			return nil, err
 		}
 		logger.Infof("load remote data success")
 
-		err = taskManager.AddTask(task.NewTask("sync_data_file", 5*time.Minute, syncData(config, storage)))
+		err = taskManager.AddTask(task.NewTask("sync_data_file", 5*time.Minute, syncData(config, st)))
 		if err != nil {
 			logger.Errorf("add sync data file task error %s", err.Error())
 			return nil, err
