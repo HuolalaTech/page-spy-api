@@ -43,6 +43,14 @@ type Config struct {
 	MaxLogLifeTimeOfHour int64 `json:"maxLogLifeTimeOfHour"`
 }
 
+func (c *Config) GetLogDir() string {
+	if c.StorageConfig == nil {
+		return "log"
+	}
+
+	return c.StorageConfig.GetLogDir()
+}
+
 func (c *Config) IsRemoteStorage() bool {
 	return c.StorageConfig != nil
 }

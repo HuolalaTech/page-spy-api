@@ -115,7 +115,7 @@ func loadData(config *config.Config, remoteStorage storage.StorageApi) error {
 		return nil
 	}
 
-	remotePath := path.Join(config.StorageConfig.BaseDir, filePath)
+	remotePath := path.Join(config.GetLogDir(), filePath)
 	exist, err := remoteStorage.Exist(remotePath)
 	if err != nil {
 		return fmt.Errorf("failed to head remote data file %s", err.Error())
