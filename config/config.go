@@ -20,6 +20,7 @@ type StorageConfig struct {
 	Bucket   string `json:"bucket"`
 }
 
+// Config 应用配置结构体
 type Config struct {
 	Port                string         `json:"port"`
 	Debug               bool           `json:"debug"`
@@ -31,7 +32,15 @@ type Config struct {
 	// max log file size, unit is mb
 	MaxLogFileSizeOfMB int64 `json:"maxLogFileSizeOfMB"`
 	// max log file size, unit is day
-	MaxLogLifeTimeOfHour int64 `json:"maxLogLifeTimeOfHour"`
+	MaxLogLifeTimeOfHour int64       `json:"maxLogLifeTimeOfHour"`
+	AuthConfig           *AuthConfig `json:"authConfig"`
+}
+
+// AuthConfig 认证配置结构体
+type AuthConfig struct {
+	Password        string `json:"password"`        // 认证密码
+	JwtSecret       string `json:"jwtSecret"`       // JWT密钥
+	TokenExpiration int    `json:"tokenExpiration"` // 令牌过期时间(小时)
 }
 
 func (c *Config) IsRemoteStorage() bool {
