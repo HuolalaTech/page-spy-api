@@ -112,7 +112,7 @@ func GenerateToken(cfg *config.Config) (string, int, error) {
 func ParseToken(tokenString string) (*Claims, error) {
 	// 确保JWT密钥已初始化
 	if len(jwtSecret) == 0 {
-		return nil, fmt.Errorf("JWT密钥未初始化")
+		return nil, fmt.Errorf("JWT secret not initialized")
 	}
 
 	// 解析JWT令牌

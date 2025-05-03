@@ -39,13 +39,13 @@ func Auth(cfg *config.Config) echo.MiddlewareFunc {
 			// 获取Authorization头
 			authHeader := c.Request().Header.Get("Authorization")
 			if authHeader == "" {
-				return c.JSON(http.StatusUnauthorized, common.NewErrorResponseWithCode("未提供认证令牌", "MISSING_TOKEN"))
+				return c.JSON(http.StatusUnauthorized, common.NewErrorResponseWithCode("Authentication token not provided", "MISSING_TOKEN"))
 			}
 
 			// Bearer Token格式验证
 			parts := strings.Split(authHeader, " ")
 			if len(parts) != 2 || parts[0] != "Bearer" {
-				return c.JSON(http.StatusUnauthorized, common.NewErrorResponseWithCode("认证令牌格式无效", "INVALID_TOKEN_FORMAT"))
+				return c.JSON(http.StatusUnauthorized, common.NewErrorResponseWithCode("Invalid authentication token format", "INVALID_TOKEN_FORMAT"))
 			}
 
 			token := parts[1]
@@ -53,7 +53,7 @@ func Auth(cfg *config.Config) echo.MiddlewareFunc {
 			// 解析和验证JWT令牌
 			claims, err := ParseToken(token)
 			if err != nil {
-				return c.JSON(http.StatusUnauthorized, common.NewErrorResponseWithCode("认证令牌已过期或无效", "EXPIRED_OR_INVALID_TOKEN"))
+				return c.JSON(http.StatusUnauthorized, common.NewErrorResponseWithCode("Authentication token expired or invalid", "EXPIRED_OR_INVALID_TOKEN"))
 			}
 
 			// 将JWT声明存储在上下文中，以便后续使用
@@ -94,7 +94,7 @@ func VerifyPassword(cfg *config.Config, password string) bool {
 func SetPassword(cfg *config.Config, password string) error {
 	// 如果环境变量中已设置密码，则不允许通过接口修改
 	if envPassword := os.Getenv("AUTH_PASSWORD"); envPassword != "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "系统使用环境变量中的密码，无法通过接口设置")
+		return echo.NewHTTPError(http.StatusBadRequest, "System is using password from environment variable, cannot set via API")
 	}
 
 	// 更新配置中的密码

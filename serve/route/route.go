@@ -113,28 +113,28 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		// 解析请求体中的密码
 		var passwordReq PasswordRequest
 		if err := c.Bind(&passwordReq); err != nil {
-			return c.JSON(http.StatusBadRequest, common.NewErrorResponseWithCode("无效的请求格式", "INVALID_REQUEST"))
+			return c.JSON(http.StatusBadRequest, common.NewErrorResponseWithCode("Invalid request format", "INVALID_REQUEST"))
 		}
 
 		// 检查是否设置了密码
 		if !selfMiddleware.IsPasswordSet(config) {
-			return c.JSON(http.StatusOK, common.NewErrorResponseWithCode("系统未设置密码，请先设置密码", "PASSWORD_REQUIRED"))
+			return c.JSON(http.StatusOK, common.NewErrorResponseWithCode("System password not set, please set a password first", "PASSWORD_REQUIRED"))
 		}
 
 		// 验证密码
 		if !selfMiddleware.VerifyPassword(config, passwordReq.Password) {
-			return c.JSON(http.StatusOK, common.NewErrorResponseWithCode("密码错误", "INVALID_PASSWORD"))
+			return c.JSON(http.StatusOK, common.NewErrorResponseWithCode("Incorrect password", "INVALID_PASSWORD"))
 		}
 
 		// 生成JWT令牌
 		token, expirationHours, err := selfMiddleware.GenerateToken(config)
 		if err != nil {
-			return c.JSON(http.StatusInternalServerError, common.NewErrorResponseWithCode("生成令牌失败", "TOKEN_GENERATION_FAILED"))
+			return c.JSON(http.StatusInternalServerError, common.NewErrorResponseWithCode("Failed to generate token", "TOKEN_GENERATION_FAILED"))
 		}
 
 		return c.JSON(http.StatusOK, common.NewSuccessResponse(map[string]interface{}{
 			"success":   true,
-			"message":   "认证成功",
+			"message":   "Authentication successful",
 			"token":     token,
 			"expiresIn": expirationHours * 3600, // 过期时间，单位秒
 		}))
@@ -149,17 +149,17 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		// 解析请求体中的密码
 		var passwordReq PasswordRequest
 		if err := c.Bind(&passwordReq); err != nil {
-			return c.JSON(http.StatusBadRequest, common.NewErrorResponseWithCode("无效的请求格式", "INVALID_REQUEST"))
+			return c.JSON(http.StatusBadRequest, common.NewErrorResponseWithCode("Invalid request format", "INVALID_REQUEST"))
 		}
 
 		// 检查是否已经设置了密码
 		if selfMiddleware.IsPasswordSet(config) {
-			return c.JSON(http.StatusOK, common.NewErrorResponseWithCode("密码已设置，不能重复设置", "PASSWORD_ALREADY_SET"))
+			return c.JSON(http.StatusOK, common.NewErrorResponseWithCode("Password already set, cannot set again", "PASSWORD_ALREADY_SET"))
 		}
 
 		// 密码验证逻辑
 		if passwordReq.Password == "" {
-			return c.JSON(http.StatusOK, common.NewErrorResponseWithCode("密码不能为空", "INVALID_PASSWORD"))
+			return c.JSON(http.StatusOK, common.NewErrorResponseWithCode("Password cannot be empty", "INVALID_PASSWORD"))
 		}
 
 		// 设置密码
@@ -169,18 +169,18 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 			if httpErr, ok := err.(*echo.HTTPError); ok {
 				return c.JSON(http.StatusOK, common.NewErrorResponseWithCode(httpErr.Message.(string), "ENV_PASSWORD_SET"))
 			}
-			return c.JSON(http.StatusInternalServerError, common.NewErrorResponseWithCode("设置密码失败", "PASSWORD_SET_FAILED"))
+			return c.JSON(http.StatusInternalServerError, common.NewErrorResponseWithCode("Failed to set password", "PASSWORD_SET_FAILED"))
 		}
 
 		// 生成JWT令牌
 		token, expirationHours, err := selfMiddleware.GenerateToken(config)
 		if err != nil {
-			return c.JSON(http.StatusInternalServerError, common.NewErrorResponseWithCode("生成令牌失败", "TOKEN_GENERATION_FAILED"))
+			return c.JSON(http.StatusInternalServerError, common.NewErrorResponseWithCode("Failed to generate token", "TOKEN_GENERATION_FAILED"))
 		}
 
 		return c.JSON(http.StatusOK, common.NewSuccessResponse(map[string]interface{}{
 			"success":            true,
-			"message":            "密码设置成功",
+			"message":            "Password set successfully",
 			"token":              token,
 			"passwordConfigured": true,
 			"expiresIn":          expirationHours * 3600, // 过期时间，单位秒
