@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/labstack/gommon/log"
 )
@@ -20,7 +21,42 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
-	return loadLocalConfigFile()
+	config, err := loadLocalConfigFile()
+	if err != nil {
+		return nil, err
+	}
+
+	// 从环境变量加载认证配置
+	loadAuthConfigFromEnv(config)
+
+	return config, nil
+}
+
+// 从环境变量加载认证配置
+func loadAuthConfigFromEnv(config *Config) {
+	// 初始化 AuthConfig 如果不存在
+	if config.AuthConfig == nil {
+		config.AuthConfig = &AuthConfig{
+			TokenExpiration: 24, // 默认24小时
+		}
+	}
+
+	// 从环境变量读取密码
+	if envPassword := os.Getenv("AUTH_PASSWORD"); envPassword != "" {
+		config.AuthConfig.Password = envPassword
+	}
+
+	// 从环境变量读取JWT密钥
+	if jwtSecret := os.Getenv("JWT_SECRET"); jwtSecret != "" {
+		config.AuthConfig.JwtSecret = jwtSecret
+	}
+
+	// 从环境变量读取Token过期时间
+	if expHours := os.Getenv("JWT_EXPIRATION_HOURS"); expHours != "" {
+		if hours, err := strconv.Atoi(expHours); err == nil && hours > 0 {
+			config.AuthConfig.TokenExpiration = hours
+		}
+	}
 }
 
 func checkLocalConfigFile() error {
