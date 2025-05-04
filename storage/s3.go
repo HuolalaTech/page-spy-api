@@ -19,7 +19,7 @@ type RemoteApi struct {
 }
 
 func (a *RemoteApi) joinPath(id string) string {
-	return path.Join(a.config.BaseDir, "log", id)
+	return path.Join(a.config.BaseDir, a.config.GetLogDir(), id)
 }
 
 func (a *RemoteApi) newSession() (*session.Session, error) {
@@ -105,6 +105,10 @@ func (a *RemoteApi) Get(path string) (io.ReadCloser, int64, error) {
 	}
 
 	return result.Body, *result.ContentLength, nil
+}
+
+func (a *RemoteApi) ExistLog(fileId string) (bool, error) {
+	return a.Exist(a.joinPath(fileId))
 }
 
 func (a *RemoteApi) GetLog(fileId string) (*LogFile, error) {

@@ -12,12 +12,21 @@ type CorsConfig struct {
 }
 
 type StorageConfig struct {
-	BaseDir  string `json:"baseDir"`
-	KeyId    string `json:"keyId"`
-	Secret   string `json:"secret"`
-	Region   string `json:"region"`
-	Endpoint string `json:"endpoint"`
-	Bucket   string `json:"bucket"`
+	LogDirName string `json:"logDir"`
+ 	BaseDir    string `json:"baseDir"`
+ 	KeyId      string `json:"keyId"`
+ 	Secret     string `json:"secret"`
+ 	Region     string `json:"region"`
+ 	Endpoint   string `json:"endpoint"`
+ 	Bucket     string `json:"bucket"`
+}
+
+func (s *StorageConfig) GetLogDir() string {
+	if s.LogDirName == "" {
+		return "log"
+	}
+
+	return s.LogDirName
 }
 
 // Config 应用配置结构体
@@ -34,6 +43,14 @@ type Config struct {
 	// max log file size, unit is day
 	MaxLogLifeTimeOfHour int64       `json:"maxLogLifeTimeOfHour"`
 	AuthConfig           *AuthConfig `json:"authConfig"`
+}
+
+func (c *Config) GetLogDir() string {
+	if c.StorageConfig == nil {
+		return "log"
+	}
+
+	return c.StorageConfig.GetLogDir()
 }
 
 // AuthConfig 认证配置结构体

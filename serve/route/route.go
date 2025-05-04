@@ -220,6 +220,16 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return nil
 	})
 
+	protectedRoute.GET("/log/count", func(c echo.Context) error {
+		key := c.QueryParam("key")
+		result, err := core.data.CountLogsGroup(key)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(200, common.NewSuccessResponse(result))
+	})
+
 	protectedRoute.GET("/log/download", func(c echo.Context) error {
 		fileId := c.QueryParam("fileId")
 		machine, err := core.GetMachineIdByFileName(fileId)
@@ -366,6 +376,28 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		}
 
 		createFile, err := core.CreateLogGroupFile(logFile)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(200, common.NewSuccessResponse(createFile))
+	})
+
+	publicRoute.POST("/jsonLog/upload", func(c echo.Context) error {
+		fileName := c.QueryParam("name")
+		body, err := io.ReadAll(c.Request().Body)
+		if err != nil {
+			return fmt.Errorf("open upload file error: %w", err)
+		}
+
+		logFile := &storage.LogFile{
+			Tags:       getTags(c.QueryParams()),
+			Name:       fileName,
+			Size:       int64(len(body)),
+			UpdateFile: body,
+		}
+
+		createFile, err := core.CreateFile(logFile)
 		if err != nil {
 			return err
 		}

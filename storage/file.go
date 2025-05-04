@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -34,6 +35,33 @@ func (f *FileApi) SaveLog(log *LogFile) error {
 	return nil
 }
 
+func (f *FileApi) ExistLog(fileId string) (bool, error) {
+	if fileId == "" {
+		return false, fmt.Errorf("get log file error: fileId is empty")
+	}
+
+	logFilePath := fmt.Sprintf("%s/%s", logDirPath, fileId)
+
+	return f.Exist(logFilePath)
+}
+
+func (f *FileApi) Exist(path string) (bool, error) {
+	if path == "" {
+		return false, fmt.Errorf("get path error: path is empty")
+	}
+
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, fmt.Errorf("get file size error: %w", err)
+	}
+
+	return true, nil
+}
+
 func (f *FileApi) GetLog(fileId string) (*LogFile, error) {
 	if fileId == "" {
 		return nil, fmt.Errorf("get log file error: fileId is empty")
@@ -41,21 +69,54 @@ func (f *FileApi) GetLog(fileId string) (*LogFile, error) {
 
 	logFilePath := fmt.Sprintf("%s/%s", logDirPath, fileId)
 
-	fileInfo, err := os.Stat(logFilePath)
+	fileSteam, fileSize, err := f.Get(logFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("get file size error: %w", err)
-	}
-
-	fileSteam, err := os.Open(logFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("open log file error: %w", err)
+		return nil, err
 	}
 
 	return &LogFile{
 		FileId:    fileId,
-		Size:      fileInfo.Size(),
+		Size:      fileSize,
 		FileSteam: fileSteam,
 	}, nil
+}
+
+func (f *FileApi) Save(path string, stream io.ReadSeeker) error {
+	findFile, err := os.Stat(path)
+	if err == nil && findFile != nil {
+		return nil
+	}
+
+	dst, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("create log file error: %w", err)
+	}
+
+	data, err := io.ReadAll(stream)
+	if err != nil {
+		return err
+	}
+
+	defer dst.Close()
+	if _, err = dst.Write(data); err != nil {
+		return fmt.Errorf("create log file error: %w", err)
+	}
+
+	return nil
+}
+
+func (f *FileApi) Get(path string) (io.ReadCloser, int64, error) {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return nil, 0, fmt.Errorf("get file size error: %w", err)
+	}
+
+	fileSteam, err := os.Open(path)
+	if err != nil {
+		return nil, 0, fmt.Errorf("open log file error: %w", err)
+	}
+
+	return fileSteam, fileInfo.Size(), nil
 }
 
 func (f *FileApi) RemoveLog(fileId string) error {

@@ -30,7 +30,12 @@ type LogGroupFile struct {
 type StorageApi interface {
 	SaveLog(log *LogFile) error
 	GetLog(fileId string) (*LogFile, error)
+	ExistLog(fileId string) (bool, error)
 	RemoveLog(fileId string) error
+
+	Save(path string, data io.ReadSeeker) error
+	Exist(path string) (bool, error)
+	Get(path string) (io.ReadCloser, int64, error)
 }
 
 func NewStorage(config *config.Config) (StorageApi, error) {

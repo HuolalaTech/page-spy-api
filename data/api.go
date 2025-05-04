@@ -9,6 +9,7 @@ type DataApi interface {
 	FindLogGroups(query *FileListQuery) (*Page[*LogGroup], error)
 	DeleteLogGroupByGroupId(groupId string) error
 
+	CountLogsGroup(tagKey string) ([]LogGroupResult, error)
 	CreateLog(log *LogData) error
 	FindLogs(query *FileListQuery) (*Page[*LogData], error)
 	UpdateLogStatus(fileId string, status Status) error

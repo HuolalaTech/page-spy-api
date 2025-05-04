@@ -70,17 +70,18 @@ func InitData(config *gorm.Config) (*Data, error) {
 	return &Data{db: db}, nil
 }
 
-func NewData(config *config.Config, taskManager *task.TaskManager, storage storage.StorageApi) (DataApi, error) {
-	if config.IsRemoteStorage() {
+func NewData(config *config.Config, taskManager *task.TaskManager, st storage.StorageApi) (DataApi, error) {
+	_, isLocalStorage := st.(*storage.FileApi)
+	if !isLocalStorage {
 		logger.Infof("init database with remote storage")
-		err := loadData(config, storage)
+		err := loadData(config, st)
 		if err != nil {
 			logger.Infof("load remote data error %s", err.Error())
 			return nil, err
 		}
 		logger.Infof("load remote data success")
 
-		err = taskManager.AddTask(task.NewTask("sync_data_file", 5*time.Minute, syncData(config, storage)))
+		err = taskManager.AddTask(task.NewTask("sync_data_file", 5*time.Minute, syncData(config, st)))
 		if err != nil {
 			logger.Errorf("add sync data file task error %s", err.Error())
 			return nil, err
@@ -107,15 +108,14 @@ func NewData(config *config.Config, taskManager *task.TaskManager, storage stora
 	return InitData(c)
 }
 
-func loadData(config *config.Config, s storage.StorageApi) error {
+func loadData(config *config.Config, remoteStorage storage.StorageApi) error {
 	filePath := getLocalDataFilePath()
 	if util.FileExists(filePath) {
 		logger.Infof("load data already exists")
 		return nil
 	}
 
-	remotePath := path.Join(config.StorageConfig.BaseDir, filePath)
-	remoteStorage := s.(*storage.RemoteApi)
+	remotePath := path.Join(config.GetLogDir(), filePath)
 	exist, err := remoteStorage.Exist(remotePath)
 	if err != nil {
 		return fmt.Errorf("failed to head remote data file %s", err.Error())
@@ -167,9 +167,8 @@ func syncData(config *config.Config, s storage.StorageApi) func() error {
 			return err
 		}
 
-		remotePath := path.Join(config.StorageConfig.BaseDir, filePath)
-		remoteStorage := s.(*storage.RemoteApi)
-		err = remoteStorage.Save(remotePath, bytes.NewReader(content))
+		remotePath := path.Join(config.GetLogDir(), filePath)
+		err = s.Save(remotePath, bytes.NewReader(content))
 		if err != nil {
 			return err
 		}
@@ -338,6 +337,26 @@ func (query *FileListQuery) getLogDB(db *gorm.DB) *gorm.DB {
 	}
 
 	return q.Preload("Tags").Order("log_data.created_at desc")
+}
+
+type LogGroupResult struct {
+	Date  string `json:"date"`
+	Tag   string `json:"tag"`
+	Total int64  `json:"total"`
+}
+
+func (d *Data) CountLogsGroup(tagKey string) ([]LogGroupResult, error) {
+	var results []LogGroupResult
+	err := d.db.Model(&LogData{}).
+		Select("strftime('%Y-%m', log_data.created_at) as date, tags.value as tag, count(*) as total").
+		Joins("JOIN log_tags ON log_data.id = log_tags.log_data_id").
+		Joins("JOIN tags ON tags.id = log_tags.tag_id").
+		Where("tags.key = ?", tagKey).
+		Group("strftime('%Y-%m', log_data.created_at), tags.value").
+		Order("date").
+		Find(&results).Error
+
+	return results, err
 }
 
 func (d *Data) FindLogs(query *FileListQuery) (*Page[*LogData], error) {
