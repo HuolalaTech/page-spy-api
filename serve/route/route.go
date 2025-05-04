@@ -100,27 +100,127 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 	e.HidePort = true
 	e.HideBanner = true
 	route := e.Group("/api/v1")
-	route.GET("/room/list", func(c echo.Context) error {
-		socket.ListRooms(c.Response(), c.Request())
-		return nil
+
+	// 公共路由 - 无需认证
+	publicRoute := route.Group("")
+
+	// 认证相关API
+	publicRoute.POST("/auth/verify", func(c echo.Context) error {
+		type PasswordRequest struct {
+			Password string `json:"password"`
+		}
+
+		// 解析请求体中的密码
+		var passwordReq PasswordRequest
+		if err := c.Bind(&passwordReq); err != nil {
+			return c.JSON(http.StatusBadRequest, common.NewErrorResponseWithCode("Invalid request format", "INVALID_REQUEST"))
+		}
+
+		// 检查是否设置了密码
+		if !selfMiddleware.IsPasswordSet(config) {
+			return c.JSON(http.StatusOK, common.NewErrorResponseWithCode("System password not set, please set a password first", "PASSWORD_REQUIRED"))
+		}
+
+		// 验证密码
+		if !selfMiddleware.VerifyPassword(config, passwordReq.Password) {
+			return c.JSON(http.StatusOK, common.NewErrorResponseWithCode("Incorrect password", "INVALID_PASSWORD"))
+		}
+
+		// 生成JWT令牌
+		token, expirationHours, err := selfMiddleware.GenerateToken(config)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, common.NewErrorResponseWithCode("Failed to generate token", "TOKEN_GENERATION_FAILED"))
+		}
+
+		return c.JSON(http.StatusOK, common.NewSuccessResponse(map[string]interface{}{
+			"success":   true,
+			"message":   "Authentication successful",
+			"token":     token,
+			"expiresIn": expirationHours * 3600, // 过期时间，单位秒
+		}))
 	})
 
-	route.POST("/room/create", func(c echo.Context) error {
+	// 设置密码接口
+	publicRoute.POST("/auth/set-password", func(c echo.Context) error {
+		type PasswordRequest struct {
+			Password string `json:"password"`
+		}
+
+		// 解析请求体中的密码
+		var passwordReq PasswordRequest
+		if err := c.Bind(&passwordReq); err != nil {
+			return c.JSON(http.StatusBadRequest, common.NewErrorResponseWithCode("Invalid request format", "INVALID_REQUEST"))
+		}
+
+		// 检查是否已经设置了密码
+		if selfMiddleware.IsPasswordSet(config) {
+			return c.JSON(http.StatusOK, common.NewErrorResponseWithCode("Password already set, cannot set again", "PASSWORD_ALREADY_SET"))
+		}
+
+		// 密码验证逻辑
+		if passwordReq.Password == "" {
+			return c.JSON(http.StatusOK, common.NewErrorResponseWithCode("Password cannot be empty", "INVALID_PASSWORD"))
+		}
+
+		// 设置密码
+		err := selfMiddleware.SetPassword(config, passwordReq.Password)
+		if err != nil {
+			// 如果是因为环境变量设置了密码导致的错误
+			if httpErr, ok := err.(*echo.HTTPError); ok {
+				return c.JSON(http.StatusOK, common.NewErrorResponseWithCode(httpErr.Message.(string), "ENV_PASSWORD_SET"))
+			}
+			return c.JSON(http.StatusInternalServerError, common.NewErrorResponseWithCode("Failed to set password", "PASSWORD_SET_FAILED"))
+		}
+
+		// 生成JWT令牌
+		token, expirationHours, err := selfMiddleware.GenerateToken(config)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, common.NewErrorResponseWithCode("Failed to generate token", "TOKEN_GENERATION_FAILED"))
+		}
+
+		return c.JSON(http.StatusOK, common.NewSuccessResponse(map[string]interface{}{
+			"success":            true,
+			"message":            "Password set successfully",
+			"token":              token,
+			"passwordConfigured": true,
+			"expiresIn":          expirationHours * 3600, // 过期时间，单位秒
+		}))
+	})
+
+	// 密码状态检查接口
+	publicRoute.GET("/auth/status", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, common.NewSuccessResponse(map[string]interface{}{
+			"passwordConfigured": selfMiddleware.IsPasswordSet(config),
+		}))
+	})
+
+	// 无需认证的公共接口
+	publicRoute.POST("/room/create", func(c echo.Context) error {
 		socket.CreateRoom(c.Response(), c.Request())
 		return nil
 	})
 
-	route.GET("/ws/room/join", func(c echo.Context) error {
+	publicRoute.GET("/ws/room/join", func(c echo.Context) error {
 		socket.JoinRoom(c.Response(), c.Request())
 		return nil
 	})
 
-	route.GET("/room/check", func(c echo.Context) error {
+	publicRoute.GET("/room/check", func(c echo.Context) error {
 		socket.CheckRoomSecret(c.Response(), c.Request())
 		return nil
 	})
 
-	route.GET("/log/count", func(c echo.Context) error {
+	// 受保护的路由组 - 需要认证
+	protectedRoute := route.Group("")
+	protectedRoute.Use(selfMiddleware.Auth(config))
+
+	// 需要认证的API
+	protectedRoute.GET("/room/list", func(c echo.Context) error {
+		socket.ListRooms(c.Response(), c.Request())
+		return nil
+	})
+
+	protectedRoute.GET("/log/count", func(c echo.Context) error {
 		key := c.QueryParam("key")
 		result, err := core.data.CountLogsGroup(key)
 		if err != nil {
@@ -130,7 +230,7 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return c.JSON(200, common.NewSuccessResponse(result))
 	})
 
-	route.GET("/log/download", func(c echo.Context) error {
+	protectedRoute.GET("/log/download", func(c echo.Context) error {
 		fileId := c.QueryParam("fileId")
 		machine, err := core.GetMachineIdByFileName(fileId)
 		if err != nil {
@@ -157,7 +257,7 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return nil
 	})
 
-	route.GET("/logGroup/list", func(c echo.Context) error {
+	protectedRoute.GET("/logGroup/list", func(c echo.Context) error {
 		query, err := getQueryList(c)
 		if err != nil {
 			return err
@@ -171,7 +271,7 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return c.JSON(200, common.NewSuccessResponse(logGroups))
 	})
 
-	route.GET("/logGroup/files", func(c echo.Context) error {
+	protectedRoute.GET("/logGroup/files", func(c echo.Context) error {
 		groupId := c.QueryParam("groupId")
 		if groupId == "" {
 			return fmt.Errorf("groupId is required")
@@ -185,7 +285,7 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return c.JSON(200, common.NewSuccessResponse(logFiles))
 	})
 
-	route.GET("/log/list", func(c echo.Context) error {
+	protectedRoute.GET("/log/list", func(c echo.Context) error {
 		query, err := getQueryList(c)
 		if err != nil {
 			return err
@@ -199,7 +299,7 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return c.JSON(200, common.NewSuccessResponse(logs))
 	})
 
-	route.DELETE("/log/delete", func(c echo.Context) error {
+	protectedRoute.DELETE("/log/delete", func(c echo.Context) error {
 		if config.NotAllowedDeleteLog {
 			return fmt.Errorf("not allowed delete log")
 		}
@@ -223,7 +323,7 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return c.JSON(200, common.NewSuccessResponse(true))
 	})
 
-	route.DELETE("/logGroup/delete", func(c echo.Context) error {
+	protectedRoute.DELETE("/logGroup/delete", func(c echo.Context) error {
 		if config.NotAllowedDeleteLog {
 			return fmt.Errorf("not allowed delete log")
 		}
@@ -240,7 +340,8 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return c.JSON(200, common.NewSuccessResponse(true))
 	})
 
-	route.POST("/logGroup/upload", func(c echo.Context) error {
+	// 以下是需要公开的上传接口
+	publicRoute.POST("/logGroup/upload", func(c echo.Context) error {
 		file, err := c.FormFile("log")
 		if err != nil {
 			return err
@@ -256,6 +357,7 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		if err != nil {
 			return fmt.Errorf("read upload file error: %w", err)
 		}
+
 		ts := getTags(c.QueryParams())
 
 		groupId := c.QueryParam("groupId")
@@ -281,7 +383,7 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return c.JSON(200, common.NewSuccessResponse(createFile))
 	})
 
-	route.POST("/jsonLog/upload", func(c echo.Context) error {
+	publicRoute.POST("/jsonLog/upload", func(c echo.Context) error {
 		fileName := c.QueryParam("name")
 		body, err := io.ReadAll(c.Request().Body)
 		if err != nil {
@@ -303,7 +405,7 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		return c.JSON(200, common.NewSuccessResponse(createFile))
 	})
 
-	route.POST("/log/upload", func(c echo.Context) error {
+	publicRoute.POST("/log/upload", func(c echo.Context) error {
 		file, err := c.FormFile("log")
 		if err != nil {
 			return err

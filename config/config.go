@@ -13,12 +13,12 @@ type CorsConfig struct {
 
 type StorageConfig struct {
 	LogDirName string `json:"logDir"`
-	BaseDir    string `json:"baseDir"`
-	KeyId      string `json:"keyId"`
-	Secret     string `json:"secret"`
-	Region     string `json:"region"`
-	Endpoint   string `json:"endpoint"`
-	Bucket     string `json:"bucket"`
+ 	BaseDir    string `json:"baseDir"`
+ 	KeyId      string `json:"keyId"`
+ 	Secret     string `json:"secret"`
+ 	Region     string `json:"region"`
+ 	Endpoint   string `json:"endpoint"`
+ 	Bucket     string `json:"bucket"`
 }
 
 func (s *StorageConfig) GetLogDir() string {
@@ -29,6 +29,7 @@ func (s *StorageConfig) GetLogDir() string {
 	return s.LogDirName
 }
 
+// Config 应用配置结构体
 type Config struct {
 	Port                string         `json:"port"`
 	Debug               bool           `json:"debug"`
@@ -40,7 +41,8 @@ type Config struct {
 	// max log file size, unit is mb
 	MaxLogFileSizeOfMB int64 `json:"maxLogFileSizeOfMB"`
 	// max log file size, unit is day
-	MaxLogLifeTimeOfHour int64 `json:"maxLogLifeTimeOfHour"`
+	MaxLogLifeTimeOfHour int64       `json:"maxLogLifeTimeOfHour"`
+	AuthConfig           *AuthConfig `json:"authConfig"`
 }
 
 func (c *Config) GetLogDir() string {
@@ -49,6 +51,13 @@ func (c *Config) GetLogDir() string {
 	}
 
 	return c.StorageConfig.GetLogDir()
+}
+
+// AuthConfig 认证配置结构体
+type AuthConfig struct {
+	Password        string `json:"password"`        // 认证密码
+	JwtSecret       string `json:"jwtSecret"`       // JWT密钥
+	TokenExpiration int    `json:"tokenExpiration"` // 令牌过期时间(小时)
 }
 
 func (c *Config) IsRemoteStorage() bool {

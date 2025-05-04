@@ -28,6 +28,24 @@ func NewErrorResponse(err error) *Response {
 	}
 }
 
+// NewErrorResponseWithCode 创建包含自定义错误码的错误响应
+func NewErrorResponseWithCode(message string, code string) *Response {
+	resp := &Response{
+		Code:    code,
+		Success: false,
+		Message: message,
+	}
+
+	// 特殊处理：密码未设置的情况
+	if code == "PASSWORD_REQUIRED" {
+		resp.Data = map[string]interface{}{
+			"needPasswordSetup": true,
+		}
+	}
+
+	return resp
+}
+
 func NewSuccessResponse(data interface{}) *Response {
 	return &Response{
 		Code:    "success",
