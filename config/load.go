@@ -34,27 +34,34 @@ func LoadConfig() (*Config, error) {
 
 // 从环境变量加载认证配置
 func loadAuthConfigFromEnv(config *Config) {
-	// 初始化 AuthConfig 如果不存在
-	if config.AuthConfig == nil {
-		config.AuthConfig = &AuthConfig{
-			TokenExpiration: 24, // 默认24小时
+	// 如果存在环境变量认证配置，才初始化 AuthConfig
+	// 检查是否有任何相关的环境变量设置
+	envPassword := os.Getenv("AUTH_PASSWORD")
+	jwtSecret := os.Getenv("JWT_SECRET")
+	expHours := os.Getenv("JWT_EXPIRATION_HOURS")
+
+	// 只有在环境变量中指定了认证相关配置时，才创建 authConfig
+	if envPassword != "" || jwtSecret != "" || expHours != "" {
+		// 初始化 AuthConfig 如果不存在
+		if config.AuthConfig == nil {
+			config.AuthConfig = &AuthConfig{
+				TokenExpiration: 24, // 默认24小时
+			}
 		}
-	}
 
-	// 从环境变量读取密码
-	if envPassword := os.Getenv("AUTH_PASSWORD"); envPassword != "" {
-		config.AuthConfig.Password = envPassword
-	}
+		// 设置环境变量中的认证参数
+		if envPassword != "" {
+			config.AuthConfig.Password = envPassword
+		}
 
-	// 从环境变量读取JWT密钥
-	if jwtSecret := os.Getenv("JWT_SECRET"); jwtSecret != "" {
-		config.AuthConfig.JwtSecret = jwtSecret
-	}
+		if jwtSecret != "" {
+			config.AuthConfig.JwtSecret = jwtSecret
+		}
 
-	// 从环境变量读取Token过期时间
-	if expHours := os.Getenv("JWT_EXPIRATION_HOURS"); expHours != "" {
-		if hours, err := strconv.Atoi(expHours); err == nil && hours > 0 {
-			config.AuthConfig.TokenExpiration = hours
+		if expHours != "" {
+			if hours, err := strconv.Atoi(expHours); err == nil && hours > 0 {
+				config.AuthConfig.TokenExpiration = hours
+			}
 		}
 	}
 }
