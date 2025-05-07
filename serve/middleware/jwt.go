@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"time"
@@ -80,6 +81,21 @@ func GenerateToken(cfg *config.Config) (string, int, error) {
 	// 确保JWT密钥已初始化
 	if len(jwtSecret) == 0 {
 		InitJWTSecret(cfg)
+
+		// 如果jwtSecret还是空的，可能是因为使用了环境变量设置密码但没有设置JWT_SECRET
+		// 此时我们需要生成一个临时密钥并保存到配置文件
+		if len(jwtSecret) == 0 && cfg.AuthConfig != nil && cfg.AuthConfig.Password != "" {
+			newSecret := generateRandomKey(32)
+			jwtSecret = newSecret
+
+			// 如果不是通过环境变量JWT_SECRET设置的，就将密钥保存到配置文件
+			if os.Getenv("JWT_SECRET") == "" {
+				// 将密钥保存到配置中
+				cfg.AuthConfig.JwtSecret = base64.StdEncoding.EncodeToString(newSecret)
+				// 保存配置到文件
+				SaveConfigToFile(cfg)
+			}
+		}
 	}
 
 	// 确定过期时间

@@ -1,11 +1,15 @@
 package config
 
 import (
+	"crypto/rand"
 	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
+	"time"
+
+	"encoding/base64"
 
 	"github.com/labstack/gommon/log"
 )
@@ -56,6 +60,12 @@ func loadAuthConfigFromEnv(config *Config) {
 
 		if jwtSecret != "" {
 			config.AuthConfig.JwtSecret = jwtSecret
+		} else if envPassword != "" && config.AuthConfig.JwtSecret == "" {
+			// 如果设置了密码但没有JWT密钥，生成一个随机的JWT密钥
+			randomSecret := generateRandomSecret(32)
+			config.AuthConfig.JwtSecret = randomSecret
+			// 保存到配置文件
+			saveConfigToFile(config)
 		}
 
 		if expHours != "" {
@@ -64,6 +74,31 @@ func loadAuthConfigFromEnv(config *Config) {
 			}
 		}
 	}
+}
+
+// 生成随机密钥（Base64编码）
+func generateRandomSecret(length int) string {
+	key := make([]byte, length)
+	_, err := rand.Read(key)
+	if err != nil {
+		// 如果随机生成失败，使用时间戳作为备选方案
+		now := time.Now().UnixNano()
+		for i := 0; i < length; i++ {
+			key[i] = byte((now >> (i % 8)) & 0xff)
+		}
+	}
+	return base64.StdEncoding.EncodeToString(key)
+}
+
+// 保存配置到文件
+func saveConfigToFile(config *Config) error {
+	// 使用互斥锁防止并发写入
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(ConfigFileName, data, 0644)
 }
 
 func checkLocalConfigFile() error {
