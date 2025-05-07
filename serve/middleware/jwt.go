@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"time"
@@ -34,20 +33,21 @@ func InitJWTSecret(cfg *config.Config) {
 		return
 	}
 
-	// 如果配置文件中没有密钥，则生成新的密钥并保存
-	newSecret := generateRandomKey(32)
-	jwtSecret = newSecret
-
-	// 更新配置
+	// 如果是首次启动（没有AuthConfig配置）
+	// 我们不自动创建JwtSecret，而是等到用户设置或跳过密码设置时再创建
 	if cfg.AuthConfig == nil {
-		cfg.AuthConfig = &config.AuthConfig{
-			TokenExpiration: 24, // 默认24小时
-		}
+		// 使用临时密钥，但不保存到配置文件
+		jwtSecret = generateRandomKey(32)
+		return
 	}
-	cfg.AuthConfig.JwtSecret = base64.StdEncoding.EncodeToString(newSecret)
 
-	// 保存新的配置
-	SaveConfigToFile(cfg)
+	// 如果有AuthConfig但没有JwtSecret（或者JwtSecret为空）
+	// 我们只在内存中使用临时密钥，不修改配置文件
+	// 当用户设置或跳过密码设置时才会保存到配置文件
+	if cfg.AuthConfig.JwtSecret == "" {
+		jwtSecret = generateRandomKey(32)
+		return
+	}
 }
 
 // 生成随机密钥

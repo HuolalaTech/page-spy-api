@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -31,11 +32,18 @@ func SaveConfigToFile(cfg *config.Config) error {
 
 // Auth 中间件用于验证请求的认证信息
 func Auth(cfg *config.Config) echo.MiddlewareFunc {
-	// 初始化JWT密钥
-	InitJWTSecret(cfg)
-
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			// 判断是否处于无密码模式，若是则跳过认证
+			if !IsPasswordSet(cfg) {
+				return next(c)
+			}
+
+			// 初始化JWT密钥 - 只在实际需要时执行
+			if len(jwtSecret) == 0 {
+				InitJWTSecret(cfg)
+			}
+
 			// 获取Authorization头
 			authHeader := c.Request().Header.Get("Authorization")
 			if authHeader == "" {
@@ -75,6 +83,11 @@ func IsPasswordSet(cfg *config.Config) bool {
 	return cfg.AuthConfig != nil && cfg.AuthConfig.Password != ""
 }
 
+// IsFirstStart 检查是否是系统首次启动
+func IsFirstStart(cfg *config.Config) bool {
+	return cfg.AuthConfig == nil
+}
+
 // VerifyPassword 验证密码是否正确
 func VerifyPassword(cfg *config.Config, password string) bool {
 	// 优先检查环境变量中的密码
@@ -97,13 +110,52 @@ func SetPassword(cfg *config.Config, password string) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "System is using password from environment variable, cannot set via API")
 	}
 
-	// 更新配置中的密码
+	// 初始化AuthConfig如果不存在
 	if cfg.AuthConfig == nil {
 		cfg.AuthConfig = &config.AuthConfig{
 			TokenExpiration: 24, // 默认24小时
 		}
 	}
+
+	// 设置密码
 	cfg.AuthConfig.Password = password
+
+	// 确保JWTSecret已设置
+	if cfg.AuthConfig.JwtSecret == "" {
+		// 生成随机密钥并设置到JwtSecret
+		newSecret := generateRandomKey(32)
+		jwtSecret = newSecret // 设置全局变量
+		cfg.AuthConfig.JwtSecret = base64.StdEncoding.EncodeToString(newSecret)
+	}
+
+	// 保存配置到文件
+	return SaveConfigToFile(cfg)
+}
+
+// SkipPasswordSetup 跳过密码设置（设置为空密码模式）
+func SkipPasswordSetup(cfg *config.Config) error {
+	// 如果环境变量中已设置密码，则不允许通过接口修改
+	if envPassword := os.Getenv("AUTH_PASSWORD"); envPassword != "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "System is using password from environment variable, cannot skip password setup")
+	}
+
+	// 初始化AuthConfig如果不存在
+	if cfg.AuthConfig == nil {
+		cfg.AuthConfig = &config.AuthConfig{
+			TokenExpiration: 24, // 默认24小时
+		}
+	}
+
+	// 设置为空密码
+	cfg.AuthConfig.Password = ""
+
+	// 确保JWTSecret已设置，即使是无密码模式
+	if cfg.AuthConfig.JwtSecret == "" {
+		// 生成随机密钥并设置到JwtSecret
+		newSecret := generateRandomKey(32)
+		jwtSecret = newSecret // 设置全局变量
+		cfg.AuthConfig.JwtSecret = base64.StdEncoding.EncodeToString(newSecret)
+	}
 
 	// 保存配置到文件
 	return SaveConfigToFile(cfg)
