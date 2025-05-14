@@ -133,91 +133,9 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 		}
 
 		return c.JSON(http.StatusOK, common.NewSuccessResponse(map[string]interface{}{
-			"success":   true,
 			"message":   "Authentication successful",
 			"token":     token,
 			"expiresIn": expirationHours * 3600, // 过期时间，单位秒
-		}))
-	})
-
-	// 设置密码接口
-	publicRoute.POST("/auth/set-password", func(c echo.Context) error {
-		type PasswordRequest struct {
-			Password string `json:"password"`
-		}
-
-		// 解析请求体中的密码
-		var passwordReq PasswordRequest
-		if err := c.Bind(&passwordReq); err != nil {
-			return c.JSON(http.StatusBadRequest, common.NewErrorResponseWithCode("Invalid request format", "INVALID_REQUEST"))
-		}
-
-		// 检查是否已经设置了密码
-		if selfMiddleware.IsPasswordSet(config) && !selfMiddleware.IsFirstStart(config) {
-			return c.JSON(http.StatusOK, common.NewErrorResponseWithCode("Password already set, cannot set again", "PASSWORD_ALREADY_SET"))
-		}
-
-		// 密码验证逻辑
-		if passwordReq.Password == "" {
-			return c.JSON(http.StatusOK, common.NewErrorResponseWithCode("Password cannot be empty", "INVALID_PASSWORD"))
-		}
-
-		// 设置密码
-		err := selfMiddleware.SetPassword(config, passwordReq.Password)
-		if err != nil {
-			// 如果是因为环境变量设置了密码导致的错误
-			if httpErr, ok := err.(*echo.HTTPError); ok {
-				return c.JSON(http.StatusOK, common.NewErrorResponseWithCode(httpErr.Message.(string), "ENV_PASSWORD_SET"))
-			}
-			return c.JSON(http.StatusInternalServerError, common.NewErrorResponseWithCode("Failed to set password", "PASSWORD_SET_FAILED"))
-		}
-
-		// 生成JWT令牌
-		token, expirationHours, err := selfMiddleware.GenerateToken(config)
-		if err != nil {
-			return c.JSON(http.StatusInternalServerError, common.NewErrorResponseWithCode("Failed to generate token", "TOKEN_GENERATION_FAILED"))
-		}
-
-		return c.JSON(http.StatusOK, common.NewSuccessResponse(map[string]interface{}{
-			"success":            true,
-			"message":            "Password set successfully",
-			"token":              token,
-			"passwordConfigured": true,
-			"expiresIn":          expirationHours * 3600, // 过期时间，单位秒
-		}))
-	})
-
-	// 跳过密码设置接口
-	publicRoute.POST("/auth/skip-password", func(c echo.Context) error {
-		// 检查是否已经设置了密码
-		if selfMiddleware.IsPasswordSet(config) && !selfMiddleware.IsFirstStart(config) {
-			return c.JSON(http.StatusOK, common.NewErrorResponseWithCode("Password already set, cannot skip password setup", "PASSWORD_ALREADY_SET"))
-		}
-
-		// 跳过密码设置
-		err := selfMiddleware.SkipPasswordSetup(config)
-		if err != nil {
-			// 如果是因为环境变量设置了密码导致的错误
-			if httpErr, ok := err.(*echo.HTTPError); ok {
-				return c.JSON(http.StatusOK, common.NewErrorResponseWithCode(httpErr.Message.(string), "ENV_PASSWORD_SET"))
-			}
-			return c.JSON(http.StatusInternalServerError, common.NewErrorResponseWithCode("Failed to skip password setup", "PASSWORD_SKIP_FAILED"))
-		}
-
-		// 无密码模式下，我们不生成token（因为无需认证）
-		return c.JSON(http.StatusOK, common.NewSuccessResponse(map[string]interface{}{
-			"success":            true,
-			"message":            "Password setup skipped successfully",
-			"passwordConfigured": false,
-			"noPasswordMode":     true,
-		}))
-	})
-
-	// 认证状态接口
-	publicRoute.GET("/auth/status", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, common.NewSuccessResponse(map[string]interface{}{
-			"passwordConfigured": selfMiddleware.IsPasswordSet(config),
-			"isFirstStart":       selfMiddleware.IsFirstStart(config),
 		}))
 	})
 
@@ -240,6 +158,11 @@ func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, pro
 	// 受保护的路由组 - 需要认证
 	protectedRoute := route.Group("")
 	protectedRoute.Use(selfMiddleware.Auth(config))
+
+	// 认证状态接口
+	protectedRoute.GET("/auth/status", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, common.NewSuccessResponse(true))
+	})
 
 	// 需要认证的API
 	protectedRoute.GET("/room/list", func(c echo.Context) error {
