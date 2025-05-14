@@ -13,12 +13,12 @@ type CorsConfig struct {
 
 type StorageConfig struct {
 	LogDirName string `json:"logDir"`
- 	BaseDir    string `json:"baseDir"`
- 	KeyId      string `json:"keyId"`
- 	Secret     string `json:"secret"`
- 	Region     string `json:"region"`
- 	Endpoint   string `json:"endpoint"`
- 	Bucket     string `json:"bucket"`
+	BaseDir    string `json:"baseDir"`
+	KeyId      string `json:"keyId"`
+	Secret     string `json:"secret"`
+	Region     string `json:"region"`
+	Endpoint   string `json:"endpoint"`
+	Bucket     string `json:"bucket"`
 }
 
 func (s *StorageConfig) GetLogDir() string {
