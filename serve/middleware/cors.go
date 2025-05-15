@@ -34,15 +34,15 @@ func CORS(c *config.Config) echo.MiddlewareFunc {
 		}
 
 		if !isEmptyArray(c.CorsConfig.AllowMethods) {
-			config.AllowOrigins = c.CorsConfig.AllowMethods
+			config.AllowMethods = c.CorsConfig.AllowMethods
 		}
 
 		if !isEmptyArray(c.CorsConfig.AllowHeaders) {
-			config.AllowOrigins = c.CorsConfig.AllowHeaders
+			config.AllowHeaders = c.CorsConfig.AllowHeaders
 		}
 
 		if !isEmptyArray(c.CorsConfig.ExposeHeaders) {
-			config.AllowOrigins = c.CorsConfig.ExposeHeaders
+			config.ExposeHeaders = c.CorsConfig.ExposeHeaders
 		}
 	}
 
