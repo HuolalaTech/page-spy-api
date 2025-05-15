@@ -13,7 +13,7 @@ func isEmptyArray(a []string) bool {
 func CORS(c *config.Config) echo.MiddlewareFunc {
 	config := middleware.CORSConfig{
 		AllowOrigins:     []string{},
-		AllowMethods:     []string{"HEAD", "POST", "GET", "OPTIONS", "PUT", "DELETE", "PATCH"},
+		AllowMethods:     []string{"HEAD", "POST", "GET", "OPTIONS", "PUT", "DELETE", "UPDATE"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Length", "X-Request-Id", "Content-Type", "Referer", "User-Agent", "Host"},
 		ExposeHeaders:    []string{"X-Request-Id"},
 		AllowCredentials: true,
@@ -34,15 +34,15 @@ func CORS(c *config.Config) echo.MiddlewareFunc {
 		}
 
 		if !isEmptyArray(c.CorsConfig.AllowMethods) {
-			config.AllowMethods = c.CorsConfig.AllowMethods
+			config.AllowOrigins = c.CorsConfig.AllowMethods
 		}
 
 		if !isEmptyArray(c.CorsConfig.AllowHeaders) {
-			config.AllowHeaders = c.CorsConfig.AllowHeaders
+			config.AllowOrigins = c.CorsConfig.AllowHeaders
 		}
 
 		if !isEmptyArray(c.CorsConfig.ExposeHeaders) {
-			config.ExposeHeaders = c.CorsConfig.ExposeHeaders
+			config.AllowOrigins = c.CorsConfig.ExposeHeaders
 		}
 	}
 
