@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/json"
 	"io/fs"
+	"os"
 )
 
 type CorsConfig struct {
@@ -51,6 +53,17 @@ func (c *Config) GetLogDir() string {
 	}
 
 	return c.StorageConfig.GetLogDir()
+}
+
+// 保存配置到文件
+func (c *Config) Save() error {
+	// 使用互斥锁防止并发写入
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(ConfigFileName, data, 0644)
 }
 
 // AuthConfig 认证配置结构体

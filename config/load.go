@@ -64,8 +64,6 @@ func loadAuthConfigFromEnv(config *Config) {
 			// 如果设置了密码但没有JWT密钥，生成一个随机的JWT密钥
 			randomSecret := generateRandomSecret(32)
 			config.AuthConfig.JwtSecret = randomSecret
-			// 保存到配置文件
-			saveConfigToFile(config)
 		}
 
 		if expHours != "" {
@@ -73,6 +71,9 @@ func loadAuthConfigFromEnv(config *Config) {
 				config.AuthConfig.TokenExpiration = hours
 			}
 		}
+
+		// 保存到配置文件
+		config.Save()
 	}
 }
 
@@ -88,17 +89,6 @@ func generateRandomSecret(length int) string {
 		}
 	}
 	return base64.StdEncoding.EncodeToString(key)
-}
-
-// 保存配置到文件
-func saveConfigToFile(config *Config) error {
-	// 使用互斥锁防止并发写入
-	data, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(ConfigFileName, data, 0644)
 }
 
 func checkLocalConfigFile() error {
