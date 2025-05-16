@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/json"
 	"io/fs"
+	"os"
 )
 
 type CorsConfig struct {
@@ -29,6 +31,7 @@ func (s *StorageConfig) GetLogDir() string {
 	return s.LogDirName
 }
 
+// Config 应用配置结构体
 type Config struct {
 	Port                string         `json:"port"`
 	Debug               bool           `json:"debug"`
@@ -40,7 +43,8 @@ type Config struct {
 	// max log file size, unit is mb
 	MaxLogFileSizeOfMB int64 `json:"maxLogFileSizeOfMB"`
 	// max log file size, unit is day
-	MaxLogLifeTimeOfHour int64 `json:"maxLogLifeTimeOfHour"`
+	MaxLogLifeTimeOfHour int64       `json:"maxLogLifeTimeOfHour"`
+	AuthConfig           *AuthConfig `json:"authConfig"`
 }
 
 func (c *Config) GetLogDir() string {
@@ -49,6 +53,24 @@ func (c *Config) GetLogDir() string {
 	}
 
 	return c.StorageConfig.GetLogDir()
+}
+
+// 保存配置到文件
+func (c *Config) Save() error {
+	// 使用互斥锁防止并发写入
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(ConfigFileName, data, 0644)
+}
+
+// AuthConfig 认证配置结构体
+type AuthConfig struct {
+	Password        string `json:"password"`        // 认证密码
+	JwtSecret       string `json:"jwtSecret"`       // JWT密钥
+	TokenExpiration int    `json:"tokenExpiration"` // 令牌过期时间(小时)
 }
 
 func (c *Config) IsRemoteStorage() bool {
