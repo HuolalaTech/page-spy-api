@@ -25,6 +25,7 @@ type Page[T OrderData] struct {
 
 type OrderData interface {
 	GetOrderValue() float64
+	GetUniqKey() string
 }
 
 func (p *Page[T]) Merge(result rpc.MergeResult) error {
@@ -44,6 +45,20 @@ func (p *Page[T]) Desc() {
 	})
 }
 
+func (p *Page[T]) UniqData() {
+	seen := make(map[string]struct{})
+	clonedData := make([]T, 0, len(p.Data))
+
+	for _, item := range p.Data {
+		itemKey := item.GetUniqKey()
+		if _, exists := seen[itemKey]; !exists {
+			seen[itemKey] = struct{}{}
+			clonedData = append(clonedData, item)
+		}
+	}
+	p.Data = clonedData
+}
+
 func (p *Page[T]) New() rpc.MergeResult {
 	return &Page[T]{}
 }
@@ -57,6 +72,10 @@ type Model struct {
 
 func (m *Model) GetOrderValue() float64 {
 	return float64(m.CreatedAt.Unix())
+}
+
+func (m *Model) GetUniqKey() string {
+	return fmt.Sprintf("%d_%d", m.ID, m.CreatedAt.Unix())
 }
 
 type LogData struct {
