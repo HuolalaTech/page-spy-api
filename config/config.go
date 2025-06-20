@@ -37,6 +37,7 @@ type Config struct {
 	Debug               bool           `json:"debug"`
 	NotAllowedDeleteLog bool           `json:"notAllowedDeleteLog"`
 	RpcAddress          []*Address     `json:"rpcAddress"`
+	SelfRpcAddress      *Address       `json:"selfRpcAddress"`
 	CorsConfig          *CorsConfig    `json:"corsConfig"`
 	StorageConfig       *StorageConfig `json:"storageConfig"`
 	MaxRoomNumber       int            `json:"maxRoomNumber"`

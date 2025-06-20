@@ -64,7 +64,7 @@ func InitData(config *gorm.Config) (*Data, error) {
 	}
 
 	if err := db.AutoMigrate(&LogData{}, &LogGroup{}, &Tag{}); err != nil {
-		return nil, fmt.Errorf("failed to auto migrate database")
+		return nil, fmt.Errorf("failed to auto migrate database %w", err)
 	}
 
 	return &Data{db: db}, nil

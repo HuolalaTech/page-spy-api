@@ -45,8 +45,12 @@ func getAvailablePortWithLimit() (string, error) {
 	return getAvailablePort(5)
 }
 
-func GetSelfAddress(info []*config.Address) *config.Address {
-	for _, address := range info {
+func GetSelfAddress(c *config.Config) *config.Address {
+	if c.SelfRpcAddress != nil {
+		return c.SelfRpcAddress
+	}
+
+	for _, address := range c.RpcAddress {
 		if address.Ip == util.GetLocalIP() {
 			return address
 		}
@@ -71,11 +75,11 @@ func NewAddressManager(c *config.Config) (*AddressManager, error) {
 		},
 	}
 
-	if c.RpcAddress == nil || len(c.RpcAddress) <= 0 {
+	if len(c.RpcAddress) == 0 {
 		return localManager, nil
 	}
 
-	selfAddress := GetSelfAddress(c.RpcAddress)
+	selfAddress := GetSelfAddress(c)
 	if selfAddress == nil {
 		return nil, fmt.Errorf("multi-instance deploy failed, IP %s not found in instances list of configuration", util.GetLocalIP())
 	}
