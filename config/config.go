@@ -13,6 +13,10 @@ type CorsConfig struct {
 	ExposeHeaders []string `json:"exposeHeaders"`
 }
 
+type DatabaseConfig struct {
+	MySQLURL string `json:"mysqlUrl"` // MySQL connection URL, if empty use SQLite
+}
+
 type StorageConfig struct {
 	LogDirName string `json:"logDir"`
 	BaseDir    string `json:"baseDir"`
@@ -33,14 +37,15 @@ func (s *StorageConfig) GetLogDir() string {
 
 // Config 应用配置结构体
 type Config struct {
-	Port                string         `json:"port"`
-	Debug               bool           `json:"debug"`
-	NotAllowedDeleteLog bool           `json:"notAllowedDeleteLog"`
-	RpcAddress          []*Address     `json:"rpcAddress"`
-	SelfRpcAddress      *Address       `json:"selfRpcAddress"`
-	CorsConfig          *CorsConfig    `json:"corsConfig"`
-	StorageConfig       *StorageConfig `json:"storageConfig"`
-	MaxRoomNumber       int            `json:"maxRoomNumber"`
+	Port                string          `json:"port"`
+	Debug               bool            `json:"debug"`
+	NotAllowedDeleteLog bool            `json:"notAllowedDeleteLog"`
+	RpcAddress          []*Address      `json:"rpcAddress"`
+	SelfRpcAddress      *Address        `json:"selfRpcAddress"`
+	CorsConfig          *CorsConfig     `json:"corsConfig"`
+	StorageConfig       *StorageConfig  `json:"storageConfig"`
+	DatabaseConfig      *DatabaseConfig `json:"databaseConfig"`
+	MaxRoomNumber       int             `json:"maxRoomNumber"`
 	// max log file size, unit is mb
 	MaxLogFileSizeOfMB int64 `json:"maxLogFileSizeOfMB"`
 	// max log file size, unit is day
