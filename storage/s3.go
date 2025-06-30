@@ -25,9 +25,10 @@ func (a *RemoteApi) joinPath(id string) string {
 func (a *RemoteApi) newSession() (*session.Session, error) {
 	config := a.config
 	session, err := session.NewSession(&aws.Config{
-		Region:      aws.String(config.Region),
-		Credentials: credentials.NewStaticCredentials(config.KeyId, config.Secret, ""),
-		Endpoint:    aws.String(config.Endpoint),
+		Region:           aws.String(config.Region),
+		Credentials:      credentials.NewStaticCredentials(config.KeyId, config.Secret, ""),
+		Endpoint:         aws.String(config.Endpoint),
+		S3ForcePathStyle: aws.Bool(config.S3ForcePathStyle),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sessionion: %w", err)
