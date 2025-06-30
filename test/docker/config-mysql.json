@@ -1,0 +1,28 @@
+{
+	"port": "6752",
+	"debug": true,
+	"corsConfig": {
+		"allowOrigins": [
+			"*"
+		],
+		"allowMethods": [
+			"GET",
+			"POST",
+			"PUT",
+			"DELETE",
+			"OPTIONS"
+		],
+		"allowHeaders": [
+			"*"
+		],
+		"exposeHeaders": [
+			"*"
+		]
+	},
+	"databaseConfig": {
+		"mysqlUrl": "pagespy:pagespy123@tcp(localhost:3306)/pagespy?charset=utf8mb4&parseTime=True&loc=Local"
+	},
+	"maxRoomNumber": 500,
+	"maxLogFileSizeOfMB": 10240,
+	"maxLogLifeTimeOfHour": 720
+}

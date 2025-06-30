@@ -16,6 +16,7 @@ import (
 	"github.com/HuolalaTech/page-spy-api/task"
 	"github.com/HuolalaTech/page-spy-api/util"
 	"github.com/glebarez/sqlite"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	gormLogger "gorm.io/gorm/logger"
 )
@@ -50,21 +51,33 @@ func initDataFilePath() (string, error) {
 
 var logger = selfLogger.Log().WithField("module", "database")
 
-func InitData(config *gorm.Config) (*Data, error) {
-	dataPath, err := initDataFilePath()
-	if err != nil {
-		return nil, fmt.Errorf("failed to init data path")
+func InitData(cfg *config.Config, gormConfig *gorm.Config) (*Data, error) {
+	var db *gorm.DB
+	var err error
+
+	// 如果配置了 MySQL URL，使用 MySQL，否则使用 SQLite
+	if cfg.DatabaseConfig != nil && cfg.DatabaseConfig.MySQLURL != "" {
+		logger.Infof("init database with MySQL: %s", cfg.DatabaseConfig.MySQLURL)
+		db, err = gorm.Open(mysql.Open(cfg.DatabaseConfig.MySQLURL), gormConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to MySQL database: %w", err)
+		}
+	} else {
+		// 使用 SQLite（默认）
+		dataPath, err := initDataFilePath()
+		if err != nil {
+			return nil, fmt.Errorf("failed to init data path")
+		}
+
+		logger.Infof("init database with SQLite file: %s", dataPath)
+		db, err = gorm.Open(sqlite.Open(dataPath), gormConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to SQLite database: %w", err)
+		}
 	}
 
-	logger.Infof("init database with file %s", dataPath)
-	db, err := gorm.Open(sqlite.Open(dataPath), config)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect database")
-	}
-
-	if err := db.AutoMigrate(&LogData{}, &LogGroup{}, &Tag{}); err != nil {
-		return nil, fmt.Errorf("failed to auto migrate database")
+	if err := db.AutoMigrate(&LogGroup{}, &LogData{}, &Tag{}); err != nil {
+		return nil, fmt.Errorf("failed to auto migrate database %w", err)
 	}
 
 	return &Data{db: db}, nil
@@ -105,7 +118,7 @@ func NewData(config *config.Config, taskManager *task.TaskManager, st storage.St
 		),
 	}
 
-	return InitData(c)
+	return InitData(config, c)
 }
 
 func loadData(config *config.Config, remoteStorage storage.StorageApi) error {
