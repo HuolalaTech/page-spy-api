@@ -213,6 +213,7 @@ func (c *CoreApi) GetFileList(query *data.FileListQuery) (*data.Page[*data.LogDa
 	}
 
 	res.Desc()
+	res.UniqData()
 	return res, nil
 }
 
