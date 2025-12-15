@@ -26,7 +26,7 @@ English | [中文](./README_ZH.md)
 
 ## What's this
 
-The repo is the backend service for [HuolalaTech/page-spy-web][main-repo], which includes static resource serving, HTTP service, and WebSocket service.
+The repo is the backend service for [HuolalaTech/page-spy-web][main-repo], which includes static resource serving, HTTP service, WebSocket service, and MCP service. 
 
 ## How to use
 

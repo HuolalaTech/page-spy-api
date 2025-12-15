@@ -12,7 +12,9 @@ import (
 	"github.com/HuolalaTech/page-spy-api/config"
 	"github.com/HuolalaTech/page-spy-api/data"
 	"github.com/HuolalaTech/page-spy-api/proxy"
+	roomManagerPkg "github.com/HuolalaTech/page-spy-api/room"
 	"github.com/HuolalaTech/page-spy-api/serve/common"
+	"github.com/HuolalaTech/page-spy-api/serve/mcp"
 	selfMiddleware "github.com/HuolalaTech/page-spy-api/serve/middleware"
 	"github.com/HuolalaTech/page-spy-api/serve/socket"
 	"github.com/HuolalaTech/page-spy-api/static"
@@ -92,14 +94,37 @@ func getQueryList(c echo.Context) (*data.FileListQuery, error) {
 	return query, nil
 }
 
-func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, proxyManager *proxy.ProxyManager, staticConfig *config.StaticConfig) *echo.Echo {
+func NewEcho(socket *socket.WebSocket, core *CoreApi, config *config.Config, proxyManager *proxy.ProxyManager, staticConfig *config.StaticConfig, roomManager *roomManagerPkg.RemoteRpcRoomManager) *echo.Echo {
 	e := echo.New()
 	e.Use(selfMiddleware.Logger())
 	e.Use(selfMiddleware.Error())
 	e.Use(selfMiddleware.CORS(config))
 	e.HidePort = true
 	e.HideBanner = true
+
+	// MCP (Streamable HTTP) - same port, path: /mcp
+	mcpHandler := mcp.NewHandler(roomManager)
+	mcpRoute := e.Group("/mcp")
+	mcpRoute.Use(selfMiddleware.Auth(config))
+	mcpRoute.POST("", mcpHandler.Post)
+	mcpRoute.POST("/", mcpHandler.Post)
+	mcpRoute.GET("", mcpHandler.Get)
+	mcpRoute.GET("/", mcpHandler.Get)
+	mcpRoute.DELETE("", mcpHandler.Delete)
+	mcpRoute.DELETE("/", mcpHandler.Delete)
+	mcpRoute.Any("/*", mcpHandler.AnySubpath)
+
 	route := e.Group("/api/v1")
+	// MCP compatibility route: /api/v1/mcp (some clients/users might misconfigure)
+	apiMcpRoute := route.Group("/mcp")
+	apiMcpRoute.Use(selfMiddleware.Auth(config))
+	apiMcpRoute.POST("", mcpHandler.Post)
+	apiMcpRoute.POST("/", mcpHandler.Post)
+	apiMcpRoute.GET("", mcpHandler.Get)
+	apiMcpRoute.GET("/", mcpHandler.Get)
+	apiMcpRoute.DELETE("", mcpHandler.Delete)
+	apiMcpRoute.DELETE("/", mcpHandler.Delete)
+	apiMcpRoute.Any("/*", mcpHandler.AnySubpath)
 
 	// 公共路由 - 无需认证
 	publicRoute := route.Group("")

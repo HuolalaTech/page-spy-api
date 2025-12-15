@@ -24,7 +24,7 @@
 
 ## 简介
 
-该仓库是 [HuolalaTech/page-spy-web][main-repo] 的后端服务，其中包括静态资源服务，http 服务以及 websocket 服务。
+该仓库是 [HuolalaTech/page-spy-web][main-repo] 的后端服务，其中包括静态资源服务，http 服务、websocket 服务、MCP服务。
 
 ## 如何使用
 
