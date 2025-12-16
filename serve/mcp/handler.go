@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -128,13 +129,21 @@ type listRoomsArgs struct {
 }
 
 type readRoomDebugLogArgs struct {
-	Address   string   `json:"address"`
-	Secret    string   `json:"secret,omitempty"`
-	Limit     int      `json:"limit,omitempty"`
-	TimeoutMs int      `json:"timeoutMs,omitempty"`
-	SinceID   string   `json:"sinceId,omitempty"`
-	Format    string   `json:"format,omitempty"`
-	Type      []string `json:"type,omitempty"`
+	Address        string         `json:"address"`
+	Secret         string         `json:"secret,omitempty"`
+	Limit          int            `json:"limit,omitempty"`
+	TimeoutMs      int            `json:"timeoutMs,omitempty"`
+	SinceID        string         `json:"sinceId,omitempty"`
+	Format         string         `json:"format,omitempty"`
+	Type           []string       `json:"type,omitempty"`
+	LogType        []string       `json:"logType,omitempty"`
+	Search         string         `json:"search,omitempty"`
+	SearchRegex    bool           `json:"searchRegex,omitempty"`
+	CaseSensitive  bool           `json:"caseSensitive,omitempty"`
+	Fields         []string       `json:"fields,omitempty"`
+	TimeRange      *timeRangeArgs `json:"timeRange,omitempty"`
+	MaxScan        int            `json:"maxScan,omitempty"`
+	CompactContent bool           `json:"compactContent,omitempty"`
 }
 
 type watchRoomDebugLogArgs struct {
@@ -144,6 +153,13 @@ type watchRoomDebugLogArgs struct {
 	DurationMs int      `json:"durationMs,omitempty"`
 	Format     string   `json:"format,omitempty"`
 	Type       []string `json:"type,omitempty"`
+	LogType    []string `json:"logType,omitempty"`
+	Search     string   `json:"search,omitempty"`
+	SearchRegex bool    `json:"searchRegex,omitempty"`
+	CaseSensitive bool  `json:"caseSensitive,omitempty"`
+	Fields     []string `json:"fields,omitempty"`
+	MaxScan    int      `json:"maxScan,omitempty"`
+	CompactContent bool `json:"compactContent,omitempty"`
 }
 
 type getRoomSummaryArgs struct {
@@ -153,10 +169,232 @@ type getRoomSummaryArgs struct {
 	TimeoutMs int    `json:"timeoutMs,omitempty"`
 }
 
+type timeRangeArgs struct {
+	Start int64 `json:"start,omitempty"`
+	End   int64 `json:"end,omitempty"`
+}
+
 func toolErrorf(format string, args ...any) *mcp.CallToolResult {
 	r := mcp.NewToolResultText(fmt.Sprintf(format, args...))
 	r.IsError = true
 	return r
+}
+
+func hasAnyOptimizationEnabled(a readRoomDebugLogArgs) bool {
+	return len(a.Fields) > 0 || a.Search != "" || (a.TimeRange != nil && (a.TimeRange.Start > 0 || a.TimeRange.End > 0)) || len(a.LogType) > 0 || a.MaxScan > 0 || a.CompactContent
+}
+
+type simpleLog struct {
+	ID          string `json:"id"`
+	MessageType string `json:"type"`
+	LogType     string `json:"logType,omitempty"`
+	Message     string `json:"message,omitempty"`
+	URL         string `json:"url,omitempty"`
+	Time        int64  `json:"time"`
+}
+
+func normalizeLower(s string) string {
+	return strings.ToLower(strings.TrimSpace(s))
+}
+
+func stringInSet(v string, set map[string]struct{}) bool {
+	if v == "" || len(set) == 0 {
+		return len(set) == 0
+	}
+	_, ok := set[normalizeLower(v)]
+	return ok
+}
+
+func buildStringSet(list []string) map[string]struct{} {
+	if len(list) == 0 {
+		return nil
+	}
+	out := map[string]struct{}{}
+	for _, s := range list {
+		ss := normalizeLower(s)
+		if ss == "" {
+			continue
+		}
+		out[ss] = struct{}{}
+	}
+	return out
+}
+
+func simplifyEvent(e clientDebugEvent) simpleLog {
+	out := simpleLog{
+		ID:          e.ID,
+		MessageType: e.MessageType,
+		Time:        e.CreatedAt,
+	}
+
+	var raw map[string]any
+	if err := json.Unmarshal(e.Item, &raw); err != nil {
+		return out
+	}
+	data, _ := raw["data"].(map[string]any)
+	if data == nil {
+		return out
+	}
+
+	if v, ok := data["url"].(string); ok {
+		out.URL = v
+	}
+	if v, ok := data["logType"].(string); ok {
+		out.LogType = v
+	}
+	if v, ok := data["time"].(float64); ok && v > 0 {
+		out.Time = int64(v)
+	}
+
+	// console: logs[].value
+	if logs, ok := data["logs"].([]any); ok && len(logs) > 0 {
+		parts := make([]string, 0, len(logs))
+		for _, it := range logs {
+			m, ok := it.(map[string]any)
+			if !ok {
+				continue
+			}
+			if s, ok := m["value"].(string); ok && strings.TrimSpace(s) != "" {
+				parts = append(parts, s)
+				continue
+			}
+			if s, ok := m["text"].(string); ok && strings.TrimSpace(s) != "" {
+				parts = append(parts, s)
+				continue
+			}
+		}
+		out.Message = strings.Join(parts, " ")
+	}
+
+	return out
+}
+
+func toLogMap(l simpleLog, fields []string) map[string]any {
+	if len(fields) == 0 {
+		return map[string]any{
+			"id":      l.ID,
+			"type":    l.MessageType,
+			"logType": l.LogType,
+			"message": l.Message,
+			"url":     l.URL,
+			"time":    l.Time,
+		}
+	}
+	set := buildStringSet(fields)
+	out := map[string]any{}
+	if stringInSet("id", set) {
+		out["id"] = l.ID
+	}
+	if stringInSet("type", set) {
+		out["type"] = l.MessageType
+	}
+	if stringInSet("logType", set) {
+		out["logType"] = l.LogType
+	}
+	if stringInSet("message", set) {
+		out["message"] = l.Message
+	}
+	if stringInSet("url", set) {
+		out["url"] = l.URL
+	}
+	if stringInSet("time", set) {
+		out["time"] = l.Time
+	}
+	return out
+}
+
+func filterLogs(
+	events []clientDebugEvent,
+	search string,
+	searchRegex bool,
+	caseSensitive bool,
+	logTypeSet map[string]struct{},
+	timeRange *timeRangeArgs,
+	maxScan int,
+) ([]simpleLog, map[string]any, error) {
+	scanned := 0
+	matched := 0
+	var latestID string
+	var latestAt int64
+
+	var re *regexp.Regexp
+	if search != "" && searchRegex {
+		pat := search
+		if !caseSensitive && !strings.HasPrefix(pat, "(?i)") {
+			pat = "(?i)" + pat
+		}
+		rr, err := regexp.Compile(pat)
+		if err != nil {
+			return nil, nil, err
+		}
+		re = rr
+	}
+
+	out := make([]simpleLog, 0, min(50, len(events)))
+	for _, e := range events {
+		if maxScan > 0 && scanned >= maxScan {
+			break
+		}
+		scanned++
+		l := simplifyEvent(e)
+
+		if timeRange != nil {
+			if timeRange.Start > 0 && l.Time < timeRange.Start {
+				continue
+			}
+			if timeRange.End > 0 && l.Time > timeRange.End {
+				continue
+			}
+		}
+		if len(logTypeSet) > 0 && !stringInSet(l.LogType, logTypeSet) {
+			continue
+		}
+
+		if search != "" {
+			hay := l.Message
+			if hay == "" {
+				hay = string(e.Item)
+			}
+			if re != nil {
+				if !re.MatchString(hay) {
+					continue
+				}
+			} else {
+				if caseSensitive {
+					if !strings.Contains(hay, search) {
+						continue
+					}
+				} else {
+					if !strings.Contains(strings.ToLower(hay), strings.ToLower(search)) {
+						continue
+					}
+				}
+			}
+		}
+
+		matched++
+		latestID = l.ID
+		latestAt = l.Time
+		out = append(out, l)
+	}
+
+	stats := map[string]any{
+		"scanned":  scanned,
+		"matched": matched,
+		"latestId": func() any {
+			if latestID == "" {
+				return nil
+			}
+			return latestID
+		}(),
+		"latestAt": func() any {
+			if latestAt <= 0 {
+				return nil
+			}
+			return latestAt
+		}(),
+	}
+	return out, stats, nil
 }
 
 func (h *Handler) handleListRooms(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -199,6 +437,9 @@ func (h *Handler) handleReadRoomDebugLog(ctx context.Context, request mcp.CallTo
 	if a.Format == "" {
 		a.Format = "text"
 	}
+	if a.MaxScan < 0 {
+		a.MaxScan = 0
+	}
 
 	addr, _ := parseAddress(a.Address)
 	roomInfo, err := h.roomManager.GetRoom(ctx, &roomApi.Info{Address: addr})
@@ -220,11 +461,45 @@ func (h *Handler) handleReadRoomDebugLog(ctx context.Context, request mcp.CallTo
 	}
 
 	if a.Format == "json" {
+		if hasAnyOptimizationEnabled(a) {
+			logTypeSet := buildStringSet(a.LogType)
+			logs, stats, err := filterLogs(events, a.Search, a.SearchRegex, a.CaseSensitive, logTypeSet, a.TimeRange, a.MaxScan)
+			if err != nil {
+				return toolErrorf("Search/filter failed: %v", err), nil
+			}
+			logMaps := make([]map[string]any, 0, len(logs))
+			for _, l := range logs {
+				logMaps = append(logMaps, toLogMap(l, a.Fields))
+			}
+			payload := map[string]any{"logs": logMaps, "stats": stats}
+			var bs []byte
+			if a.CompactContent {
+				bs, _ = json.Marshal(payload)
+			} else {
+				bs, _ = json.MarshalIndent(payload, "", "  ")
+			}
+			return mcp.NewToolResultStructured(payload, string(bs)), nil
+		}
+
 		bs, err := json.MarshalIndent(events, "", "  ")
 		if err != nil {
 			return toolErrorf("Marshal result failed: %v", err), nil
 		}
 		return mcp.NewToolResultStructured(map[string]any{"events": events}, string(bs)), nil
+	}
+
+	if hasAnyOptimizationEnabled(a) {
+		logTypeSet := buildStringSet(a.LogType)
+		logs, stats, err := filterLogs(events, a.Search, a.SearchRegex, a.CaseSensitive, logTypeSet, a.TimeRange, a.MaxScan)
+		if err != nil {
+			return toolErrorf("Search/filter failed: %v", err), nil
+		}
+		lines := make([]string, 0, len(logs)+2)
+		lines = append(lines, fmt.Sprintf("matched=%v scanned=%v latestId=%v latestAt=%v", stats["matched"], stats["scanned"], stats["latestId"], stats["latestAt"]))
+		for _, l := range logs {
+			lines = append(lines, fmt.Sprintf("%d %s %s %s %s", l.Time, l.MessageType, l.LogType, strings.TrimSpace(l.URL), strings.TrimSpace(l.Message)))
+		}
+		return mcp.NewToolResultText(strings.TrimSpace(strings.Join(lines, "\n"))), nil
 	}
 	return mcp.NewToolResultText(formatClientEventsText(events)), nil
 }
@@ -245,6 +520,9 @@ func (h *Handler) handleWatchRoomDebugLog(ctx context.Context, request mcp.CallT
 	}
 	if a.Format == "" {
 		a.Format = "text"
+	}
+	if a.MaxScan < 0 {
+		a.MaxScan = 0
 	}
 
 	addr, _ := parseAddress(a.Address)
@@ -267,11 +545,45 @@ func (h *Handler) handleWatchRoomDebugLog(ctx context.Context, request mcp.CallT
 	}
 
 	if a.Format == "json" {
+		if a.Search != "" || len(a.Fields) > 0 || len(a.LogType) > 0 || a.MaxScan > 0 || a.CompactContent {
+			logTypeSet := buildStringSet(a.LogType)
+			logs, stats, err := filterLogs(events, a.Search, a.SearchRegex, a.CaseSensitive, logTypeSet, nil, a.MaxScan)
+			if err != nil {
+				return toolErrorf("Search/filter failed: %v", err), nil
+			}
+			logMaps := make([]map[string]any, 0, len(logs))
+			for _, l := range logs {
+				logMaps = append(logMaps, toLogMap(l, a.Fields))
+			}
+			payload := map[string]any{"logs": logMaps, "stats": stats}
+			var bs []byte
+			if a.CompactContent {
+				bs, _ = json.Marshal(payload)
+			} else {
+				bs, _ = json.MarshalIndent(payload, "", "  ")
+			}
+			return mcp.NewToolResultStructured(payload, string(bs)), nil
+		}
+
 		bs, err := json.MarshalIndent(events, "", "  ")
 		if err != nil {
 			return toolErrorf("Marshal result failed: %v", err), nil
 		}
 		return mcp.NewToolResultStructured(map[string]any{"events": events}, string(bs)), nil
+	}
+
+	if a.Search != "" || len(a.Fields) > 0 || len(a.LogType) > 0 || a.MaxScan > 0 {
+		logTypeSet := buildStringSet(a.LogType)
+		logs, stats, err := filterLogs(events, a.Search, a.SearchRegex, a.CaseSensitive, logTypeSet, nil, a.MaxScan)
+		if err != nil {
+			return toolErrorf("Search/filter failed: %v", err), nil
+		}
+		lines := make([]string, 0, len(logs)+2)
+		lines = append(lines, fmt.Sprintf("matched=%v scanned=%v latestId=%v latestAt=%v", stats["matched"], stats["scanned"], stats["latestId"], stats["latestAt"]))
+		for _, l := range logs {
+			lines = append(lines, fmt.Sprintf("%d %s %s %s %s", l.Time, l.MessageType, l.LogType, strings.TrimSpace(l.URL), strings.TrimSpace(l.Message)))
+		}
+		return mcp.NewToolResultText(strings.TrimSpace(strings.Join(lines, "\n"))), nil
 	}
 	return mcp.NewToolResultText(formatClientEventsText(events)), nil
 }
