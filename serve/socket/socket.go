@@ -180,32 +180,59 @@ func onRoomMessage(ctx context.Context, socket *socket, room roomApi.RemoteRoom)
 
 func (s *WebSocket) serveRoom(opt *roomApi.Info, connection *roomApi.Connection, socket *socket, room roomApi.RemoteRoom) {
 	retCode := "success"
-	close := func() {
+	var retCodeMu sync.RWMutex
+	getRetCode := func() string {
+		retCodeMu.RLock()
+		defer retCodeMu.RUnlock()
+		return retCode
+	}
+	setRetCode := func(code string) {
+		retCodeMu.Lock()
+		retCode = code
+		retCodeMu.Unlock()
+	}
+
+	cleanup := func() {
+		code := getRetCode()
 		err := s.roomManager.LeaveRoom(context.Background(), opt, connection)
 		if err != nil {
-			joinLog.Errorf("serveRoom %s close %v code %s", opt.Address.ID, err, retCode)
+			joinLog.Errorf("serveRoom %s close %v code %s", opt.Address.ID, err, code)
 		}
-		room.Close(context.Background(), retCode)
+		if err := room.Close(context.Background(), code); err != nil {
+			joinLog.Errorf("serveRoom %s close room %v code %s", opt.Address.ID, err, code)
+		}
 	}
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 
 	metric.Count("tunnel_room", map[string]string{
 		"action": "join",
-		"code":   retCode,
+		"code":   getRetCode(),
 	}, 1)
 
 	defer func() {
 		cancel()
-		metric.Count("tunnel_room", map[string]string{"action": "close", "code": retCode}, 1)
-		close()
+		code := getRetCode()
+		metric.Count("tunnel_room", map[string]string{"action": "close", "code": code}, 1)
+		cleanup()
 	}()
 
 	socket.conn.SetCloseHandler(func(code int, text string) error {
+		setRetCode("remote_close")
 		cancel()
-		retCode = "remote_close"
 		return nil
 	})
+
+	go func() {
+		select {
+		case <-cancelCtx.Done():
+		case <-room.Done():
+			setRetCode("room_close")
+		}
+		if err := socket.conn.Close(); err != nil {
+			joinLog.WithError(err).Debug("close websocket connection")
+		}
+	}()
 
 	go func() {
 		writeCode := "success"
@@ -217,7 +244,7 @@ func (s *WebSocket) serveRoom(opt *roomApi.Info, connection *roomApi.Connection,
 			}, 1)
 
 			if err := recover(); err != nil {
-				retCode = "panic_close"
+				setRetCode("panic_close")
 				joinLog.Error("serve connection panic", connection.Address.ID, err, string(debug.Stack()))
 			}
 		}()
@@ -228,11 +255,13 @@ func (s *WebSocket) serveRoom(opt *roomApi.Info, connection *roomApi.Connection,
 				return
 			case <-room.Done():
 				writeCode = "room_close"
+				setRetCode(writeCode)
 				return
 			default:
 				err := onRoomMessage(cancelCtx, socket, room)
 				if err != nil {
 					writeCode = "write_message_close"
+					setRetCode(writeCode)
 					socket.writeWebsocketError(err)
 					joinLog.WithField("connection", connection.Address.ID).Info(err)
 					return
@@ -246,12 +275,20 @@ func (s *WebSocket) serveRoom(opt *roomApi.Info, connection *roomApi.Connection,
 		case <-cancelCtx.Done():
 			return
 		case <-room.Done():
-			retCode = "room_close"
+			setRetCode("room_close")
 			return
 		default:
 			err := s.readClientMessage(cancelCtx, socket, room)
 			if err != nil {
-				retCode = "read_message_close"
+				if cancelCtx.Err() != nil {
+					return
+				}
+				select {
+				case <-room.Done():
+					setRetCode("room_close")
+				default:
+					setRetCode("read_message_close")
+				}
 				socket.writeWebsocketError(err)
 				joinLog.WithField("readClientMessage", connection.Address.ID).Info(err)
 				return
