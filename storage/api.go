@@ -47,7 +47,7 @@ func NewStorage(config *config.Config) (StorageApi, error) {
 }
 
 func NewS3Api(config *config.StorageConfig) (StorageApi, error) {
-	return &RemoteApi{config: config}, nil
+	return newRemoteApi(config)
 }
 
 func NewFileApi() (StorageApi, error) {

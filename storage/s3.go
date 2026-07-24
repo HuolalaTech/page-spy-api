@@ -16,6 +16,7 @@ import (
 
 type RemoteApi struct {
 	config *config.StorageConfig
+	client *s3.S3
 }
 
 func (a *RemoteApi) joinPath(id string) string {
@@ -24,6 +25,10 @@ func (a *RemoteApi) joinPath(id string) string {
 
 func (a *RemoteApi) newSession() (*session.Session, error) {
 	config := a.config
+	if config == nil {
+		return nil, fmt.Errorf("storage config is nil")
+	}
+
 	session, err := session.NewSession(&aws.Config{
 		Region:           aws.String(config.Region),
 		Credentials:      credentials.NewStaticCredentials(config.KeyId, config.Secret, ""),
@@ -36,14 +41,18 @@ func (a *RemoteApi) newSession() (*session.Session, error) {
 	return session, nil
 }
 
-func (a *RemoteApi) Save(path string, data io.ReadSeeker) error {
-	session, err := a.newSession()
+func newRemoteApi(config *config.StorageConfig) (*RemoteApi, error) {
+	api := &RemoteApi{config: config}
+	session, err := api.newSession()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	svc := s3.New(session)
+	api.client = s3.New(session)
+	return api, nil
+}
 
-	_, err = svc.PutObject(&s3.PutObjectInput{
+func (a *RemoteApi) Save(path string, data io.ReadSeeker) error {
+	_, err := a.client.PutObject(&s3.PutObjectInput{
 		Bucket: aws.String(a.config.Bucket),
 		Key:    aws.String(path),
 		Body:   data,
@@ -66,13 +75,7 @@ func (a *RemoteApi) SaveLog(log *LogFile) error {
 }
 
 func (a *RemoteApi) Exist(path string) (bool, error) {
-	session, err := a.newSession()
-	if err != nil {
-		return false, err
-	}
-	svc := s3.New(session)
-
-	_, err = svc.HeadObject(&s3.HeadObjectInput{
+	_, err := a.client.HeadObject(&s3.HeadObjectInput{
 		Bucket: aws.String(a.config.Bucket),
 		Key:    aws.String(path),
 	})
@@ -90,13 +93,7 @@ func (a *RemoteApi) Exist(path string) (bool, error) {
 }
 
 func (a *RemoteApi) Get(path string) (io.ReadCloser, int64, error) {
-	session, err := a.newSession()
-	if err != nil {
-		return nil, 0, err
-	}
-	svc := s3.New(session)
-
-	result, err := svc.GetObject(&s3.GetObjectInput{
+	result, err := a.client.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(a.config.Bucket),
 		Key:    aws.String(path),
 	})
@@ -126,13 +123,7 @@ func (a *RemoteApi) GetLog(fileId string) (*LogFile, error) {
 }
 
 func (a *RemoteApi) RemoveLog(fileId string) error {
-	session, err := a.newSession()
-	if err != nil {
-		return err
-	}
-	svc := s3.New(session)
-
-	_, err = svc.DeleteObject(&s3.DeleteObjectInput{
+	_, err := a.client.DeleteObject(&s3.DeleteObjectInput{
 		Bucket: aws.String(a.config.Bucket),
 		Key:    aws.String(a.joinPath(fileId)),
 	})
@@ -140,7 +131,7 @@ func (a *RemoteApi) RemoveLog(fileId string) error {
 		return fmt.Errorf("failed to delete object: %w", err)
 	}
 
-	err = svc.WaitUntilObjectNotExists(&s3.HeadObjectInput{
+	err = a.client.WaitUntilObjectNotExists(&s3.HeadObjectInput{
 		Bucket: aws.String(a.config.Bucket),
 		Key:    aws.String(a.joinPath(fileId)),
 	})
