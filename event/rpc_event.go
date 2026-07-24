@@ -2,6 +2,7 @@ package event
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -43,6 +44,10 @@ func NewRpcEventEmitter(localEventEmitter event.EventEmitter, rpcManager *rpc.Rp
 }
 
 func (e *RpcEventEmitter) Emit(r *http.Request, req *RpcEventEmitterRequest, res *RpcEventEmitterResponse) error {
+	if req == nil || req.Address == nil || req.Package == nil {
+		return res.SetError(fmt.Errorf("rpc event request is invalid"))
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(req.ContextTimeout)*time.Second)
 	defer cancel()
 	err := e.localEventEmitter.EmitLocal(ctx, req.Address, req.Package)

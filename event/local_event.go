@@ -3,6 +3,7 @@ package event
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 
 	"github.com/HuolalaTech/page-spy-api/api/event"
@@ -24,7 +25,24 @@ type LocalEventEmitter struct {
 	rwLock         sync.RWMutex
 }
 
+func sameListener(left event.Listener, right event.Listener) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+
+	leftValue := reflect.ValueOf(left)
+	rightValue := reflect.ValueOf(right)
+	if leftValue.Type() != rightValue.Type() || !leftValue.Type().Comparable() {
+		return false
+	}
+	return leftValue.Interface() == rightValue.Interface()
+}
+
 func (e *LocalEventEmitter) addListener(address *event.Address, listener event.Listener) {
+	if address == nil || listener == nil {
+		return
+	}
+
 	e.rwLock.Lock()
 	defer e.rwLock.Unlock()
 	list := e.listeners[address.ID]
@@ -32,7 +50,7 @@ func (e *LocalEventEmitter) addListener(address *event.Address, listener event.L
 		list = []event.Listener{}
 	}
 	for _, l := range list {
-		if &l == &listener {
+		if sameListener(l, listener) {
 			return
 		}
 	}
@@ -42,6 +60,10 @@ func (e *LocalEventEmitter) addListener(address *event.Address, listener event.L
 }
 
 func (e *LocalEventEmitter) RemoveListener(address *event.Address, listener event.Listener) {
+	if address == nil || listener == nil {
+		return
+	}
+
 	e.rwLock.Lock()
 	defer e.rwLock.Unlock()
 	list := e.listeners[address.ID]
@@ -51,11 +73,15 @@ func (e *LocalEventEmitter) RemoveListener(address *event.Address, listener even
 
 	newList := []event.Listener{}
 	for _, l := range list {
-		if l != listener {
+		if !sameListener(l, listener) {
 			newList = append(newList, l)
 		}
 	}
 
+	if len(newList) == 0 {
+		delete(e.listeners, address.ID)
+		return
+	}
 	e.listeners[address.ID] = newList
 }
 
@@ -71,15 +97,24 @@ func (e *LocalEventEmitter) getListeners(address *event.Address) []event.Listene
 		list = []event.Listener{}
 	}
 
-	return list
+	return append([]event.Listener(nil), list...)
 }
 
 func (e *LocalEventEmitter) emitRemote(ctx context.Context, address *event.Address, pkg *event.Package) error {
+	if e.rpcManager == nil {
+		return fmt.Errorf("rpc manager is nil")
+	}
+
 	req := NewRpcEventEmitterRequest()
 	req.Address = address
 	req.Package = pkg
 	res := NewRpcEventEmitterResponse()
-	err := e.rpcManager.GetRpcByAddress(address).Call(ctx, "RpcEventEmitter.Emit", req, res)
+	client := e.rpcManager.GetRpcByAddress(address)
+	if client == nil {
+		return fmt.Errorf("rpc client %s not found", address.MachineID)
+	}
+
+	err := client.Call(ctx, "RpcEventEmitter.Emit", req, res)
 	if err != nil {
 		return err
 	}
@@ -88,6 +123,13 @@ func (e *LocalEventEmitter) emitRemote(ctx context.Context, address *event.Addre
 }
 
 func (e *LocalEventEmitter) EmitLocal(ctx context.Context, address *event.Address, pkg *event.Package) error {
+	if address == nil {
+		return fmt.Errorf("emit local message address is nil")
+	}
+	if pkg == nil {
+		return fmt.Errorf("emit local message package is nil")
+	}
+
 	list := e.getListeners(address)
 	if len(list) <= 0 {
 		return fmt.Errorf("Emit message no Listeners %s", pkg.Content)
@@ -105,6 +147,16 @@ func (e *LocalEventEmitter) EmitLocal(ctx context.Context, address *event.Addres
 }
 
 func (e *LocalEventEmitter) Emit(ctx context.Context, address *event.Address, msg *event.Package) error {
+	if address == nil {
+		return fmt.Errorf("emit message address is nil")
+	}
+	if msg == nil {
+		return fmt.Errorf("emit message package is nil")
+	}
+	if e.addressManager == nil {
+		return fmt.Errorf("address manager is nil")
+	}
+
 	if e.addressManager.IsSelfMachineAddress(address) {
 		return e.EmitLocal(ctx, address, msg)
 	}
