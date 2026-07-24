@@ -200,6 +200,9 @@ func (c *CoreApi) ListFilesInGroup(groupId string) ([]*data.LogData, error) {
 	if err != nil {
 		return nil, err
 	}
+	if logGroup == nil {
+		return nil, fmt.Errorf("log group %s not found", groupId)
+	}
 
 	return logGroup.Logs, nil
 }
