@@ -153,6 +153,9 @@ func (a *AddressManager) GetSelfMachineID() string {
 }
 
 func (a *AddressManager) IsSelfMachineAddress(address *event.Address) bool {
+	if address == nil {
+		return false
+	}
 	return a.GetSelfMachineID() == address.MachineID
 }
 

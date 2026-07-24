@@ -3,6 +3,7 @@ package room
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/HuolalaTech/page-spy-api/api/event"
@@ -13,10 +14,14 @@ import (
 )
 
 func NewRemoteRoom(connection *room.Connection, opt *room.Info, eventEmitter event.EventEmitter, rpcRoom room.RpcRoom) (room.RemoteRoom, error) {
+	if connection == nil || connection.Address == nil || opt == nil || opt.Address == nil || rpcRoom == nil {
+		return nil, fmt.Errorf("remote room connection, option, or rpc room is invalid")
+	}
+
 	r := &remoteRoom{
 		basicRoom:    newBasicRoom(),
-		connection:   connection,
-		opt:          opt,
+		connection:   cloneConnection(connection),
+		opt:          cloneRoomInfo(opt),
 		log:          log.WithField("remote_room", connection.Address.ID).WithField("local_room", opt.Address.ID),
 		eventEmitter: eventEmitter,
 		rpcRoom:      rpcRoom,
@@ -36,20 +41,21 @@ type remoteRoom struct {
 	eventEmitter event.EventEmitter
 	rpcRoom      room.RpcRoom
 	messages     chan *room.Message
+	stateMu      sync.RWMutex
 	createdAt    time.Time
 	activeAt     time.Time
 }
 
 func (r *remoteRoom) GetRoomAddress() *event.Address {
-	return r.rpcRoom.GetRoomAddress()
+	return cloneAddress(r.rpcRoom.GetRoomAddress())
 }
 
 func (r *remoteRoom) GetInfo() *room.Info {
-	return r.rpcRoom.GetInfo()
+	return cloneRoomInfo(r.rpcRoom.GetInfo())
 }
 
 func (r *remoteRoom) UpdateInfo(info *room.Info) {
-	r.rpcRoom.UpdateInfo(info)
+	r.rpcRoom.UpdateInfo(cloneRoomInfo(info))
 }
 
 func (r *remoteRoom) Start(ctx context.Context) error {
@@ -68,8 +74,8 @@ func (r *remoteRoom) message(ctx context.Context, msg *room.Message) error {
 		return fmt.Errorf("message content is invalid")
 	}
 
-	if content.To == nil {
-		return fmt.Errorf("unicast message's field 'to' is empty")
+	if content.To == nil || content.To.Address == nil {
+		return fmt.Errorf("unicast message's field 'to.address' is empty")
 	}
 
 	content.From = r.connection
@@ -112,7 +118,9 @@ func (r *remoteRoom) SendMessage(ctx context.Context, msg *room.Message) error {
 		return fmt.Errorf("message type %s not found", msg.Type)
 	}
 
+	r.stateMu.Lock()
 	r.activeAt = time.Now()
+	r.stateMu.Unlock()
 	switch msg.Type {
 	case room.MessageType:
 		return r.message(ctx, msg)
@@ -130,12 +138,11 @@ func (r *remoteRoom) OnMessage() chan *room.Message {
 }
 
 func (r *remoteRoom) Close(ctx context.Context, code string) error {
-	r.log.Infof("room closed")
-	err := r.close()
-	if err != nil {
-		return err
+	if !r.close() {
+		return nil
 	}
 
+	r.log.Infof("room closed")
 	metric.Count("tunnel_remote_room", map[string]string{
 		"action": "close",
 		"code":   code,
@@ -149,8 +156,12 @@ func (r *remoteRoom) ShouldRemove() (string, bool) {
 		return "close", true
 	}
 
+	r.stateMu.RLock()
+	createdAt := r.createdAt
+	activeAt := r.activeAt
+	r.stateMu.RUnlock()
 	now := time.Now()
-	return "timeout", now.Sub(r.createdAt) > 1*time.Hour || now.Sub(r.activeAt) > 20*time.Second
+	return "timeout", now.Sub(createdAt) > 1*time.Hour || now.Sub(activeAt) > 20*time.Second
 }
 
 func (r *remoteRoom) Listen(ctx context.Context, msg *event.Package) {

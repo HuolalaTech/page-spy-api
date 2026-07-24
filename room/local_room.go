@@ -2,6 +2,7 @@ package room
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -15,6 +16,10 @@ import (
 )
 
 func NewLocalRoom(opt *room.Info, event event.EventEmitter, addressManager *rpc.AddressManager) (room.Room, error) {
+	if opt == nil || opt.Address == nil {
+		return nil, fmt.Errorf("room info or address is nil")
+	}
+
 	if opt.UseSecret && opt.Secret == "" {
 		return nil, fmt.Errorf("room %s use secret but secret is empty", opt.Address.ID)
 	}
@@ -22,8 +27,9 @@ func NewLocalRoom(opt *room.Info, event event.EventEmitter, addressManager *rpc.
 	opt.Connections = make([]*room.Connection, 0)
 	opt.CreatedAt = time.Now()
 	opt.ActiveAt = time.Now()
+	info := cloneRoomInfo(opt)
 
-	logger := log.WithField("room", opt.Address.ID)
+	logger := log.WithField("room", info.Address.ID)
 	logger.Infof("local room created")
 
 	return &localRoom{
@@ -31,7 +37,7 @@ func NewLocalRoom(opt *room.Info, event event.EventEmitter, addressManager *rpc.
 		closeCode:   "unknown",
 		closeReason: "unknown",
 		log:         logger,
-		Info:        opt,
+		Info:        info,
 		event:       event,
 		messages:    make(chan *room.Message, 2000),
 	}, nil
@@ -49,27 +55,51 @@ type localRoom struct {
 }
 
 func (r *localRoom) GetRoomAddress() *event.Address {
-	return r.Info.Address
+	r.rwLock.RLock()
+	defer r.rwLock.RUnlock()
+	return cloneAddress(r.Info.Address)
 }
 
 func (r *localRoom) GetRoomUsers() []*room.Connection {
-	return r.Info.Connections
+	r.rwLock.RLock()
+	defer r.rwLock.RUnlock()
+	return cloneConnections(r.Info.Connections)
 }
 
 func (r *localRoom) GetGroup() string {
+	r.rwLock.RLock()
+	defer r.rwLock.RUnlock()
 	return r.Info.Group
 }
 
 func (r *localRoom) GetInfo() *room.Info {
-	return r.Info
+	r.rwLock.RLock()
+	defer r.rwLock.RUnlock()
+	return cloneRoomInfo(r.Info)
 }
 
 func (r *localRoom) UpdateInfo(info *room.Info) {
-	r.Info.Update(info)
+	if info == nil {
+		return
+	}
+
+	r.rwLock.Lock()
+	defer r.rwLock.Unlock()
+	r.Info.Update(cloneRoomInfo(info))
 }
 
 func (r *localRoom) GetTags() map[string]string {
-	return r.Info.Tags
+	r.rwLock.RLock()
+	defer r.rwLock.RUnlock()
+	return cloneTags(r.Info.Tags)
+}
+
+func (r *localRoom) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Info *room.Info `json:"Info"`
+	}{
+		Info: r.GetInfo(),
+	})
 }
 
 func (r *localRoom) Start(ctx context.Context) error {
@@ -92,15 +122,10 @@ func (r *localRoom) Start(ctx context.Context) error {
 
 		}
 	}()
-	r.event.Listen(r.Info.Address, r)
-	r.SendMessageWithTimeout(room.NewStartMessage(*r.Info.Address), 5*time.Second)
+	address := r.GetRoomAddress()
+	r.event.Listen(address, r)
+	r.SendMessageWithTimeout(room.NewStartMessage(*address), 5*time.Second)
 	return nil
-}
-
-func (r *localRoom) addConnectionWithLock(connection *room.Connection) {
-	r.rwLock.Lock()
-	defer r.rwLock.Unlock()
-	r.Info.Connections = append(r.Info.Connections, connection)
 }
 
 func (r *localRoom) removeConnectionWithLock(connection *room.Connection) {
@@ -116,38 +141,51 @@ func (r *localRoom) removeConnectionWithLock(connection *room.Connection) {
 	r.Info.Connections = newConnections
 }
 
-func (r *localRoom) getConnectionsWithLock() []*room.Connection {
-	r.rwLock.RLock()
-	defer r.rwLock.RUnlock()
-	return r.Info.Connections
+func (r *localRoom) touchActiveAt() {
+	r.rwLock.Lock()
+	r.Info.ActiveAt = time.Now()
+	r.rwLock.Unlock()
+}
+
+func (r *localRoom) getMessageSnapshot() (*event.Address, []*room.Connection) {
+	r.rwLock.Lock()
+	defer r.rwLock.Unlock()
+	r.Info.ActiveAt = time.Now()
+	return cloneAddress(r.Info.Address), cloneConnections(r.Info.Connections)
 }
 
 func (r *localRoom) Join(ctx context.Context, connection *room.Connection, opt *room.Info) error {
-	if opt == nil {
-		return nil
+	if opt == nil || opt.Address == nil || connection == nil || connection.Address == nil {
+		return fmt.Errorf("join room info or connection is invalid")
 	}
 
+	r.rwLock.Lock()
 	if !r.Info.Address.Equal(opt.Address) {
+		r.rwLock.Unlock()
 		return fmt.Errorf("connection %s join room %s failed", connection.Address.ID, opt.Address.ID)
 	}
 
 	if r.Info.UseSecret && r.Info.Secret != opt.Secret {
+		r.rwLock.Unlock()
 		return fmt.Errorf("join failed, password from connection %s of room %s is invalid", connection.Address.ID, opt.Address.ID)
 	}
+	r.Info.Connections = append(r.Info.Connections, cloneConnection(connection))
+	r.Info.ActiveAt = time.Now()
+	r.rwLock.Unlock()
 
 	r.log.Infof("connection %s joined room", connection.Address.ID)
-	r.addConnectionWithLock(connection)
 	r.SendMessageWithTimeout(room.NewJoinMessage(connection), 5*time.Second)
 	r.SetStatus(state.RunningStatus)
 	return nil
 }
 
 func (r *localRoom) Leave(ctx context.Context, connection *room.Connection, opt *room.Info) error {
-	if opt == nil {
-		return nil
+	if opt == nil || opt.Address == nil || connection == nil || connection.Address == nil {
+		return fmt.Errorf("leave room info or connection is invalid")
 	}
 
-	if !r.Info.Address.Equal(opt.Address) {
+	address := r.GetRoomAddress()
+	if !address.Equal(opt.Address) {
 		return fmt.Errorf("connection %s leave room %s failed", connection.Address.ID, opt.Address.ID)
 	}
 
@@ -158,7 +196,7 @@ func (r *localRoom) Leave(ctx context.Context, connection *room.Connection, opt 
 }
 
 func (r *localRoom) Ping() {
-	r.Info.ActiveAt = time.Now()
+	r.touchActiveAt()
 }
 
 func (r *localRoom) pingMessage() error {
@@ -167,13 +205,12 @@ func (r *localRoom) pingMessage() error {
 }
 
 func (r *localRoom) otherMessage(ctx context.Context, msg *room.Message) error {
-	connections := r.getConnectionsWithLock()
-	eventMsg, err := roomMessageToPackage(msg, r.Info.Address)
+	address, connections := r.getMessageSnapshot()
+	eventMsg, err := roomMessageToPackage(msg, address)
 	if err != nil {
 		return err
 	}
 
-	r.Info.ActiveAt = time.Now()
 	for _, c := range connections {
 		e := r.event.Emit(ctx, c.Address, eventMsg)
 		if e != nil {
@@ -191,13 +228,16 @@ func (r *localRoom) broadcastMessage(ctx context.Context, msg *room.Message) err
 		return fmt.Errorf("message format is invalid")
 	}
 
-	connections := r.getConnectionsWithLock()
-	eventMsg, err := roomMessageToPackage(msg, r.Info.Address)
+	if content.From == nil || content.From.Address == nil {
+		return fmt.Errorf("broadcast message's field 'from.address' is empty")
+	}
+
+	address, connections := r.getMessageSnapshot()
+	eventMsg, err := roomMessageToPackage(msg, address)
 	if err != nil {
 		return err
 	}
 
-	r.Info.ActiveAt = time.Now()
 	for _, c := range connections {
 		if !(c.Address.Equal(content.From.Address) && !content.IncludeSelf) {
 			e := r.event.Emit(ctx, c.Address, eventMsg)
@@ -217,17 +257,16 @@ func (r *localRoom) messageMessage(ctx context.Context, msg *room.Message) error
 		return fmt.Errorf("message format is invalid")
 	}
 
-	if content.To == nil {
-		return fmt.Errorf("unicast message's field 'to' is empty")
+	if content.To == nil || content.To.Address == nil {
+		return fmt.Errorf("unicast message's field 'to.address' is empty")
 	}
 
-	connections := r.getConnectionsWithLock()
-	eventMsg, err := roomMessageToPackage(msg, r.Info.Address)
+	address, connections := r.getMessageSnapshot()
+	eventMsg, err := roomMessageToPackage(msg, address)
 	if err != nil {
 		return err
 	}
 
-	r.Info.ActiveAt = time.Now()
 	for _, c := range connections {
 		if c.Address.Equal(content.To.Address) {
 			e := r.event.Emit(ctx, c.Address, eventMsg)
@@ -246,7 +285,7 @@ func (r *localRoom) SendMessage(ctx context.Context, msg *room.Message) error {
 		return fmt.Errorf("message type %s not found", msg.Type)
 	}
 
-	r.Info.ActiveAt = time.Now()
+	r.touchActiveAt()
 	switch msg.Type {
 	case room.MessageType:
 		return r.messageMessage(ctx, msg)
@@ -278,33 +317,39 @@ func (r *localRoom) OnMessage() chan *room.Message {
 }
 
 func (r *localRoom) Close(ctx context.Context, closeCode string) error {
-	if r.StatusMachine.IsStatus(state.CloseStatus) {
+	if !r.close() {
 		return nil
 	}
+
+	r.rwLock.RLock()
+	address := cloneAddress(r.Info.Address)
+	reason := r.closeReason
+	code := r.closeCode
+	r.rwLock.RUnlock()
+
 	metric.Count("tunnel_local_room", map[string]string{
 		"action": "close",
-		"code":   r.closeCode,
+		"code":   code,
 	}, 1)
 
-	err := r.close()
-	if err != nil {
-		return err
-	}
-
-	r.event.RemoveListener(r.Info.Address, r)
-	r.log.Infof("room closed, %s", r.closeReason)
-	r.SendMessageWithTimeout(room.NewCloseMessage(*r.Info.Address, r.closeReason), 5*time.Second)
+	r.event.RemoveListener(address, r)
+	r.log.Infof("room closed, %s", reason)
+	r.SendMessageWithTimeout(room.NewCloseMessage(*address, reason), 5*time.Second)
 	return nil
 }
 
 func (r *localRoom) ShouldRemove() (string, bool) {
+	r.rwLock.Lock()
+	defer r.rwLock.Unlock()
+
 	if r.StatusMachine.IsStatus(state.CloseStatus) {
 		return r.closeCode, true
 	}
 
 	now := time.Now()
-	noUseInitRoom := r.IsStatus(state.InitStatus) && r.isEmpty() && now.Sub(r.Info.CreatedAt) > 1*time.Minute
-	noUserRoom := r.IsStatus(state.RunningStatus) && r.isEmpty() && now.Sub(r.Info.ActiveAt) > 1*time.Minute
+	isEmpty := len(r.Info.Connections) <= 0
+	noUseInitRoom := r.IsStatus(state.InitStatus) && isEmpty && now.Sub(r.Info.CreatedAt) > 1*time.Minute
+	noUserRoom := r.IsStatus(state.RunningStatus) && isEmpty && now.Sub(r.Info.ActiveAt) > 1*time.Minute
 	noUseRoom := r.IsStatus(state.RunningStatus) && now.Sub(r.Info.ActiveAt) > 5*time.Minute
 	maxTimeRoom := now.Sub(r.Info.CreatedAt) > 1*time.Hour
 	switch true {
@@ -323,11 +368,6 @@ func (r *localRoom) ShouldRemove() (string, bool) {
 	}
 
 	return r.closeCode, noUseInitRoom || noUserRoom || noUseRoom || maxTimeRoom
-}
-
-func (r *localRoom) isEmpty() bool {
-	connections := r.getConnectionsWithLock()
-	return len(connections) <= 0
 }
 
 func (r *localRoom) Listen(ctx context.Context, pkg *event.Package) {

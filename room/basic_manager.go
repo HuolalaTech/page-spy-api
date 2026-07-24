@@ -63,8 +63,9 @@ func (r *BasicManager) getRoomsByTags(tags map[string]string) []room.ManagerRoom
 	}
 
 	for _, rr := range rooms {
-		if rr.GetInfo() != nil && len(rr.GetInfo().Tags) > 0 {
-			if likeTags(rr.GetInfo().Tags, tags) {
+		info := rr.GetInfo()
+		if info != nil && len(info.Tags) > 0 {
+			if likeTags(info.Tags, tags) {
 				ret = append(ret, rr)
 			}
 		}
@@ -73,8 +74,8 @@ func (r *BasicManager) getRoomsByTags(tags map[string]string) []room.ManagerRoom
 	return ret
 }
 func (r *BasicManager) getRooms() []room.ManagerRoom {
-	r.rwLock.Lock()
-	defer r.rwLock.Unlock()
+	r.rwLock.RLock()
+	defer r.rwLock.RUnlock()
 	ret := []room.ManagerRoom{}
 	for _, v := range r.roomsMap {
 		ret = append(ret, v)

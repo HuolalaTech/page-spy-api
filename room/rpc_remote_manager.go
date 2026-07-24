@@ -246,6 +246,9 @@ func (r *RemoteRpcRoomManager) JoinRoom(ctx context.Context, connection *room.Co
 
 	err = r.joinRoom(ctx, connection, opt)
 	if err != nil {
+		if closeErr := remoteRoom.Close(ctx, "join_failed"); closeErr != nil {
+			log.WithError(closeErr).Error("close remote room after join failure")
+		}
 		return nil, err
 	}
 

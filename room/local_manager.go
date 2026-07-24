@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/HuolalaTech/page-spy-api/api/event"
@@ -30,6 +31,7 @@ type LocalRoomManager struct {
 	event          event.EventEmitter
 	log            *logrus.Entry
 	maxRoomSize    int64
+	createMu       sync.Mutex
 }
 
 func (r *LocalRoomManager) Start() {
@@ -71,7 +73,7 @@ func (r *LocalRoomManager) isFull() bool {
 }
 
 func (r *LocalRoomManager) UpdateRoomOption(ctx context.Context, info *room.Info) (room.Room, error) {
-	if info.Address == nil {
+	if info == nil || info.Address == nil {
 		return nil, errors.New("update room options address is nil")
 	}
 
@@ -80,16 +82,19 @@ func (r *LocalRoomManager) UpdateRoomOption(ctx context.Context, info *room.Info
 		return nil, fmt.Errorf("room %s not found", info.Address.ID)
 	}
 
-	findRoom.Info.Update(info)
+	findRoom.UpdateInfo(info)
 	return findRoom, nil
 }
 
 func (r *LocalRoomManager) CreateRoom(ctx context.Context, info *room.Info) (room.Room, error) {
+	r.createMu.Lock()
+	defer r.createMu.Unlock()
+
 	if r.isFull() {
 		return nil, errors.New("the maximum number of rooms has been reached and no more can be created")
 	}
 
-	if info.Address == nil {
+	if info == nil || info.Address == nil {
 		return nil, errors.New("create room address is nil")
 	}
 
@@ -113,6 +118,10 @@ func (r *LocalRoomManager) CreateRoom(ctx context.Context, info *room.Info) (roo
 }
 
 func (r *LocalRoomManager) GetRoom(ctx context.Context, opt *room.Info) (room.Room, error) {
+	if opt == nil || opt.Address == nil {
+		return nil, roomApi.NewRoomNotFoundError("room address is nil")
+	}
+
 	room, exist := r.getLocalRoom(opt)
 	if !exist {
 		return nil, roomApi.NewRoomNotFoundError(fmt.Sprintf("room %s not found", opt.Address.ID))
@@ -122,6 +131,10 @@ func (r *LocalRoomManager) GetRoom(ctx context.Context, opt *room.Info) (room.Ro
 }
 
 func (r *LocalRoomManager) RemoveRoom(ctx context.Context, opt *room.Info) error {
+	if opt == nil || opt.Address == nil {
+		return roomApi.NewRoomNotFoundError("room address is nil")
+	}
+
 	room, exist := r.getRoom(opt)
 	if !exist {
 		return nil
@@ -132,6 +145,10 @@ func (r *LocalRoomManager) RemoveRoom(ctx context.Context, opt *room.Info) error
 }
 
 func (r *LocalRoomManager) getLocalRoom(opt *room.Info) (*localRoom, bool) {
+	if opt == nil || opt.Address == nil {
+		return nil, false
+	}
+
 	room, exist := r.getRoom(opt)
 	if !exist {
 		return nil, exist
@@ -141,6 +158,10 @@ func (r *LocalRoomManager) getLocalRoom(opt *room.Info) (*localRoom, bool) {
 }
 
 func (r *LocalRoomManager) JoinRoom(ctx context.Context, opt *room.Info, connection *room.Connection) error {
+	if opt == nil || opt.Address == nil || connection == nil || connection.Address == nil {
+		return roomApi.NewClientError("join room info or connection is invalid")
+	}
+
 	room, exist := r.getLocalRoom(opt)
 	if !exist {
 		return roomApi.NewRoomNotFoundError(fmt.Sprintf("room %s not found, join failed", opt.Address.ID))
@@ -159,6 +180,10 @@ func (r *LocalRoomManager) JoinRoom(ctx context.Context, opt *room.Info, connect
 }
 
 func (r *LocalRoomManager) LeaveRoom(ctx context.Context, opt *room.Info, connection *room.Connection) error {
+	if opt == nil || opt.Address == nil || connection == nil || connection.Address == nil {
+		return roomApi.NewClientError("leave room info or connection is invalid")
+	}
+
 	room, exist := r.getLocalRoom(opt)
 	if !exist {
 		return roomApi.NewRoomNotFoundError(fmt.Sprintf("room %s not found, leave failed", opt.Address.ID))
