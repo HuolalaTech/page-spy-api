@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
 	"net/http"
 	"strings"
 
@@ -19,9 +21,7 @@ func Auth(cfg *config.Config) echo.MiddlewareFunc {
 			}
 
 			// 初始化JWT密钥 - 只在实际需要时执行
-			if len(jwtSecret) == 0 {
-				InitJWTSecret(cfg)
-			}
+			ensureJWTSecret(cfg)
 
 			// 获取Authorization头
 			authHeader := c.Request().Header.Get("Authorization")
@@ -53,10 +53,16 @@ func Auth(cfg *config.Config) echo.MiddlewareFunc {
 
 // IsPasswordSet 检查是否已设置密码
 func IsPasswordSet(cfg *config.Config) bool {
-	return cfg.AuthConfig != nil && cfg.AuthConfig.Password != ""
+	return cfg != nil && cfg.AuthConfig != nil && cfg.AuthConfig.Password != ""
 }
 
 // VerifyPassword 验证密码是否正确
 func VerifyPassword(cfg *config.Config, password string) bool {
-	return cfg.AuthConfig != nil && cfg.AuthConfig.Password == password
+	if cfg == nil || cfg.AuthConfig == nil {
+		return false
+	}
+
+	expected := sha256.Sum256([]byte(cfg.AuthConfig.Password))
+	actual := sha256.Sum256([]byte(password))
+	return subtle.ConstantTimeCompare(expected[:], actual[:]) == 1
 }

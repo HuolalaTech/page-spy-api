@@ -3,6 +3,7 @@ package middleware
 import (
 	"crypto/rand"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/HuolalaTech/page-spy-api/config"
@@ -10,22 +11,46 @@ import (
 )
 
 // 用于签名JWT的密钥
-var jwtSecret []byte
+var (
+	jwtSecret   []byte
+	jwtSecretMu sync.RWMutex
+)
 
 // Claims JWT声明结构
 type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// InitJWTSecret 初始化JWT密钥
-func InitJWTSecret(cfg *config.Config) {
-	if cfg.AuthConfig == nil || cfg.AuthConfig.JwtSecret == "" {
+func jwtSecretFromConfig(cfg *config.Config) []byte {
+	if cfg == nil || cfg.AuthConfig == nil || cfg.AuthConfig.JwtSecret == "" {
 		// 使用临时密钥，但不保存到配置文件
-		jwtSecret = generateRandomKey(32)
-		return
+		return generateRandomKey(32)
 	}
 
-	jwtSecret = []byte(cfg.AuthConfig.JwtSecret)
+	return []byte(cfg.AuthConfig.JwtSecret)
+}
+
+// InitJWTSecret 初始化JWT密钥
+func InitJWTSecret(cfg *config.Config) {
+	secret := jwtSecretFromConfig(cfg)
+	jwtSecretMu.Lock()
+	jwtSecret = secret
+	jwtSecretMu.Unlock()
+}
+
+func getJWTSecret() []byte {
+	jwtSecretMu.RLock()
+	defer jwtSecretMu.RUnlock()
+	return append([]byte(nil), jwtSecret...)
+}
+
+func ensureJWTSecret(cfg *config.Config) []byte {
+	jwtSecretMu.Lock()
+	defer jwtSecretMu.Unlock()
+	if len(jwtSecret) == 0 {
+		jwtSecret = jwtSecretFromConfig(cfg)
+	}
+	return append([]byte(nil), jwtSecret...)
 }
 
 // 生成随机密钥
@@ -56,9 +81,7 @@ func GetJWTExpirationHours(cfg *config.Config) int {
 // GenerateToken 生成JWT令牌
 func GenerateToken(cfg *config.Config) (string, int, error) {
 	// 确保JWT密钥已初始化
-	if len(jwtSecret) == 0 {
-		InitJWTSecret(cfg)
-	}
+	secret := ensureJWTSecret(cfg)
 
 	// 确定过期时间
 	expirationHours := GetJWTExpirationHours(cfg)
@@ -78,7 +101,7 @@ func GenerateToken(cfg *config.Config) (string, int, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	// 签名令牌
-	tokenString, err := token.SignedString(jwtSecret)
+	tokenString, err := token.SignedString(secret)
 	if err != nil {
 		return "", 0, err
 	}
@@ -89,7 +112,8 @@ func GenerateToken(cfg *config.Config) (string, int, error) {
 // ParseToken 解析和验证JWT令牌
 func ParseToken(tokenString string) (*Claims, error) {
 	// 确保JWT密钥已初始化
-	if len(jwtSecret) == 0 {
+	secret := getJWTSecret()
+	if len(secret) == 0 {
 		return nil, fmt.Errorf("JWT secret not initialized")
 	}
 
@@ -99,7 +123,7 @@ func ParseToken(tokenString string) (*Claims, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return jwtSecret, nil
+		return secret, nil
 	})
 
 	if err != nil {

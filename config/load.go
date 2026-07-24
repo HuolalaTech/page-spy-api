@@ -73,7 +73,9 @@ func loadAuthConfigFromEnv(config *Config) {
 		}
 
 		// 保存到配置文件
-		config.Save()
+		if err := config.Save(); err != nil {
+			log.Warnf("save authentication config failed: %v", err)
+		}
 	}
 }
 

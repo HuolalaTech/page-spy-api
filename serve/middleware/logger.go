@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/HuolalaTech/page-spy-api/logger"
@@ -13,6 +15,26 @@ import (
 const HeaderXRequestID = "X-Request-ID"
 
 var middlewareLogger = logger.Log().WithField("_module", "middleware")
+
+func redactRequestURI(requestURI string) string {
+	u, err := url.Parse(requestURI)
+	if err != nil {
+		return "[invalid request URI]"
+	}
+
+	query := u.Query()
+	for key, values := range query {
+		switch strings.ToLower(key) {
+		case "secret", "token", "password", "authorization", "access_token", "jwt":
+			for i := range values {
+				values[i] = "***"
+			}
+			query[key] = values
+		}
+	}
+	u.RawQuery = query.Encode()
+	return u.RequestURI()
+}
 
 func Logger() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -35,7 +57,7 @@ func Logger() echo.MiddlewareFunc {
 			endTime := time.Now()
 			latencyTime := endTime.Sub(startTime)
 			reqMethod := c.Request().Method
-			reqURI := c.Request().RequestURI
+			reqURI := redactRequestURI(c.Request().RequestURI)
 			statusCode := c.Response().Status
 			clientIP := c.RealIP()
 			metric.Time("ap_request", map[string]string{
