@@ -1,24 +1,26 @@
-# Page Spy API 项目结构与设计
+# Page Spy API Architecture
 
-本文描述 Page Spy API 当前实现的模块边界、启动过程、核心数据模型、消息链路、存储设计和多实例拓扑，供开发、评审和故障排查使用。
+English | [中文](./ARCHITECTURE_ZH.md)
 
-## 1. 设计目标
+This document describes the current module boundaries, startup sequence, data model, message paths, storage design, and multi-instance topology of Page Spy API.
 
-Page Spy API 将远程调试场景拆为两类能力：
+## 1. Design goals
 
-1. 实时通道：使用房间和 WebSocket 在调试端、被调试端之间转发消息。
-2. 持久化日志：上传、检索、下载和分组保存调试日志。
+Page Spy API divides remote debugging into two capability groups:
 
-服务同时支持：
+1. Real-time channels: rooms and WebSockets forward messages between debugger and debug target.
+2. Persistent logs: upload, query, download, group, and retain debugging logs.
 
-- 单实例运行：随机选择内部 RPC 端口，machine ID 为 `local`。
-- 多实例运行：通过固定 RPC 节点列表发现其他实例。
-- 本地部署：SQLite + 本地文件系统。
-- 外部基础设施：MySQL + S3 兼容存储。
-- 一体化部署：后端同时托管 page-spy-web 静态资源。
-- 嵌入式部署：作为 Go 模块注册到自定义 `main` 中。
+The service supports:
 
-## 2. 总体架构
+- Single-instance mode with a random internal RPC port and machine ID `local`.
+- Multi-instance mode using a fixed RPC node list.
+- Local deployments using SQLite and the local filesystem.
+- External infrastructure using MySQL and S3-compatible storage.
+- An integrated binary that also hosts Page Spy Web.
+- Embedding as a Go module in a custom application.
+
+## 2. System overview
 
 ```mermaid
 flowchart LR
@@ -53,66 +55,67 @@ flowchart LR
     RPC <--> Peer
 ```
 
-HTTP 与 WebSocket 共用配置端口；内部 RPC 使用独立端口和 `/rpc` 路径。
+HTTP and WebSocket traffic share the configured application port. Internal RPC uses a separate port and the `/rpc` path.
 
-## 3. 目录结构
+## 3. Repository layout
 
 ```text
 page-spy-api/
 ├── api/
-│   ├── event/              跨模块事件地址、包和监听器接口
-│   └── room/               房间、连接、消息、错误和接口定义
+│   ├── event/              shared event addresses, packages, and interfaces
+│   └── room/               room, connection, message, error, and interface types
 ├── bin/
-│   └── main.go             嵌入 dist 并启动完整服务
-├── config/                 配置模型、默认配置、文件和环境变量加载
-├── container/              dig 依赖注入容器
-├── data/                   GORM 数据模型与 SQLite/MySQL 实现
-├── event/                  本地事件总线和远程事件 RPC 服务
-├── logger/                 全局 logrus 入口
-├── metric/                 可注入的指标抽象，默认空实现
-├── proxy/                  多实例 HTTP 反向代理
-├── room/                   本地/远程房间及 RPC 房间管理
-├── rpc/                    节点地址、RPC server/client 和结果聚合
+│   └── main.go             embeds dist and starts the complete service
+├── config/                 models, defaults, file loading, and environment overrides
+├── container/              dig dependency-injection container
+├── data/                   GORM models and SQLite/MySQL implementation
+├── event/                  local event bus and remote event RPC service
+├── logger/                 global logrus entry point
+├── metric/                 injectable metrics abstraction with a no-op default
+├── proxy/                  multi-instance HTTP reverse proxy
+├── room/                   local/remote rooms and RPC room management
+├── rpc/                    node addresses, RPC server/client, and result aggregation
 ├── serve/
-│   ├── common/             统一 HTTP 响应
-│   ├── middleware/         认证、CORS、日志、错误、缓存
-│   ├── route/              HTTP 路由和日志领域服务
-│   └── socket/             WebSocket 握手、会话和消息循环
-├── state/                  原子状态机
-├── static/                 SPA fallback 文件系统
-├── storage/                本地文件与 S3 存储实现
-├── task/                   周期任务调度
+│   ├── common/             common HTTP response types
+│   ├── middleware/         authentication, CORS, logging, errors, and cache
+│   ├── route/              HTTP routes and log-domain operations
+│   └── socket/             WebSocket handshake, session, and message loops
+├── state/                  atomic state machine
+├── static/                 SPA fallback filesystem
+├── storage/                local file and S3 implementations
+├── task/                   periodic task scheduler
 ├── test/
-│   ├── docker/             MySQL 手工测试环境
-│   └── websocket_event_test/ 浏览器 WebSocket 测试页
-└── util/                   文件、网络、时间和字节工具
+│   ├── docker/             manual MySQL environment
+│   └── websocket_event_test/ browser WebSocket test page
+└── util/                   file, network, time, byte, and hash helpers
 ```
 
-### 3.1 API 与实现分离
+### 3.1 API and implementation separation
 
-`api/event` 和 `api/room` 只定义跨模块类型与接口，具体实现位于顶层 `event`、`room` 包中。
+`api/event` and `api/room` contain shared types and interfaces. Their implementations live in the top-level `event` and `room` packages.
 
-这种组织允许：
+This separation allows:
 
-- `serve/socket` 依赖房间接口，而不是具体本地房间。
-- 本地和远程房间使用相同消息模型。
-- RPC response 复用领域错误类型。
-- 测试通过小型 fake 替换事件、房间或存储实现。
+- `serve/socket` to depend on room interfaces instead of a concrete local room.
+- Local and remote rooms to use the same message model.
+- RPC responses to reuse domain error types.
+- Tests to replace events, rooms, data, or storage with small fakes.
 
-## 4. 启动与依赖注入
+## 4. Startup and dependency injection
 
-项目使用 `go.uber.org/dig`。
+The project uses `go.uber.org/dig`.
 
-### 4.1 启动入口
+### 4.1 Entry point
 
-`bin/main.go` 完成两件事：
+`bin/main.go`:
 
-1. 将 `bin/dist/*` 嵌入二进制。
-2. 向容器提供 `*config.StaticConfig`，然后调用 `serve.Run()`。
+1. Embeds `bin/dist/*`.
+2. Provides `*config.StaticConfig` to the container.
+3. Calls `serve.Run()`.
 
-纯后端嵌入方也必须提供同一类型，但可以返回 `nil`。
+A backend-only host must still provide the same type, but it may return `nil`.
 
-### 4.2 Provider 图
+### 4.2 Provider graph
 
 ```mermaid
 flowchart TD
@@ -154,32 +157,32 @@ flowchart TD
     Echo --> Run
 ```
 
-### 4.3 启动顺序中的副作用
+### 4.3 Constructor side effects
 
-构造函数不只是创建对象：
+Several constructors start runtime behavior:
 
-- `rpc.NewRpcManager` 会异步启动 RPC HTTP server。
-- `socket.NewManager` 会启动本地和远程房间管理器，并注册房间、事件 RPC 服务。
-- `data.NewData` 在远程存储模式下注册数据库同步任务。
-- `route.NewCore` 在本地存储模式下注册日志清理任务，并注册 Core RPC 服务。
-- `route.NewEcho` 注册中间件、HTTP、WebSocket 和静态资源路由。
-- `serve.Run` 最后启动 Echo HTTP server。
+- `rpc.NewRpcManager` starts the RPC HTTP server asynchronously.
+- `socket.NewManager` starts local and remote room managers and registers room and event RPC services.
+- `data.NewData` registers database synchronization in remote-storage mode.
+- `route.NewCore` registers local log cleanup and the Core RPC service.
+- `route.NewEcho` registers middleware, HTTP routes, WebSocket routes, and static files.
+- `serve.Run` starts the Echo HTTP server.
 
-修改构造函数时要注意这些运行期副作用和依赖顺序。
+Constructor changes must account for these side effects and their order.
 
-## 5. 地址和节点模型
+## 5. Address and node model
 
-### 5.1 单实例
+### 5.1 Single instance
 
-没有 `rpcAddress` 时：
+Without `rpcAddress`:
 
-- machine ID 固定为 `local`。
-- RPC 监听地址记录为 `127.0.0.1:<random-port>`。
-- 房间和连接地址格式为 `<uuid>.local`。
+- The machine ID is `local`.
+- The internal RPC address is `127.0.0.1:<random-port>`.
+- Room and connection addresses have the form `<uuid>.local`.
 
-### 5.2 多实例
+### 5.2 Multiple instances
 
-配置多个 RPC 地址时，所有 `ip:port` 排序后依次生成：
+With configured RPC addresses, every `ip:port` is sorted and assigned:
 
 ```text
 A0
@@ -188,37 +191,37 @@ A2
 ...
 ```
 
-当前实例通过 `selfRpcAddress` 或本机 IP 匹配确定 machine ID。所有节点必须使用相同列表，否则相同机器可能得到不同 ID。
+The current node is resolved through `selfRpcAddress` or local-IP matching. Every node must use the same list, or the same machine may receive different IDs.
 
-HTTP 反向代理使用当前节点配置的 `port` 拼接目标节点 IP，因此集群节点还必须使用相同的 HTTP 端口。
+The reverse proxy combines a peer IP with the local node's configured HTTP `port`, so every cluster node must also use the same HTTP port.
 
-### 5.3 标识格式
+### 5.3 Identifier formats
 
-| 对象 | 格式 | 示例 |
+| Object | Format | Example |
 | --- | --- | --- |
-| 房间地址 | `<local-id>.<machine-id>` | `9a...f2.A0` |
-| 连接地址 | `<local-id>.<machine-id>` | `52...c1.A1` |
-| 日志文件 ID | `<machine-id>.<md5>` | `A0.098f6bcd...` |
+| Room address | `<local-id>.<machine-id>` | `9a...f2.A0` |
+| Connection address | `<local-id>.<machine-id>` | `52...c1.A1` |
+| Log file ID | `<machine-id>.<md5>` | `A0.098f6bcd...` |
 
-地址中的 machine ID 决定房间或事件 RPC 的目标节点；日志文件 ID 的第一个字段决定下载和删除请求的代理节点。
+The machine ID in a room or connection address determines the target for room and event RPC. The first part of a log file ID determines which node handles downloads and deletion.
 
-## 6. HTTP 层
+## 6. HTTP layer
 
-### 6.1 中间件顺序
+### 6.1 Middleware order
 
-Echo 全局注册：
+Echo registers these global middleware:
 
-1. 请求日志与 `X-Request-ID`。
-2. 统一错误响应。
-3. CORS。
+1. Request logging and `X-Request-ID`.
+2. Common error responses.
+3. CORS.
 
-受保护路由组额外注册 JWT Auth 中间件。未配置系统密码时 Auth 会放行。
+The protected route group additionally uses JWT authentication. Authentication is bypassed when no system password is configured.
 
-### 6.2 路由分组
+### 6.2 Route groups
 
 ```text
 /api/v1
-├── 公共
+├── public
 │   ├── POST /auth/verify
 │   ├── POST /room/create
 │   ├── GET  /room/check
@@ -226,7 +229,7 @@ Echo 全局注册：
 │   ├── POST /log/upload
 │   ├── POST /jsonLog/upload
 │   └── POST /logGroup/upload
-└── 受保护
+└── protected
     ├── GET    /auth/status
     ├── GET    /room/list
     ├── GET    /log/count
@@ -238,9 +241,9 @@ Echo 全局注册：
     └── DELETE /logGroup/delete
 ```
 
-静态资源存在时，最后注册 `/*`，使用 `index.html` 作为 SPA fallback。
+When static files are configured, a final `/*` route serves them with `index.html` as an SPA fallback.
 
-### 6.3 日志上传数据流
+### 6.3 Log upload flow
 
 ```mermaid
 sequenceDiagram
@@ -261,29 +264,29 @@ sequenceDiagram
     Route-->>Client: Response{success,data}
 ```
 
-当前顺序是“先文件、后元数据”。任一步失败时没有跨存储事务，调用方和运维任务需要关注孤儿文件或孤儿记录。
+The current order is “file first, metadata second.” There is no transaction across the storage and database boundaries, so partial failures may leave orphaned files or metadata.
 
-### 6.4 查询、下载与删除
+### 6.4 Query, download, and deletion
 
-- 列表查询通过 RPC 调用所有节点的 `CoreApi.FindLogs` 或 `FindLogGroups`，合并后按创建时间倒序。
-- 日志列表会按 file ID 去重。
-- 下载根据 file ID 中的 machine ID 决定本地处理或 HTTP 反向代理。
-- 删除同样根据 machine ID 选择节点，然后依次删除正文和数据库记录。
+- List operations call `CoreApi.FindLogs` or `FindLogGroups` on every RPC node, merge the results, and sort by creation time.
+- Log lists are deduplicated by file ID.
+- Downloads use the machine ID in the file ID to choose local handling or HTTP reverse proxying.
+- Deletion chooses the target the same way, then removes the body and database row.
 
-## 7. 房间与 WebSocket
+## 7. Rooms and WebSockets
 
-### 7.1 核心对象
+### 7.1 Core objects
 
-| 对象 | 职责 |
+| Object | Responsibility |
 | --- | --- |
-| `LocalRoomManager` | 保存当前节点创建的真实房间。 |
-| `RemoteRpcRoomManager` | 面向 HTTP/WebSocket 的集群房间门面。 |
-| `localRoom` | 维护房间信息、连接列表和广播逻辑。 |
-| `remoteRoom` | 代表某个 WebSocket 连接到目标房间的会话。 |
-| `LocalEventEmitter` | 以 connection address 为 key 分发本地事件。 |
-| `RpcEventEmitter` | 把其他节点的事件注入本地事件总线。 |
+| `LocalRoomManager` | Stores real rooms created on the current node. |
+| `RemoteRpcRoomManager` | Cluster-wide room facade used by HTTP and WebSocket handlers. |
+| `localRoom` | Maintains room information, connections, and broadcast behavior. |
+| `remoteRoom` | Represents one WebSocket connection's session with a target room. |
+| `LocalEventEmitter` | Delivers local events keyed by connection address. |
+| `RpcEventEmitter` | Injects events from another node into the local event bus. |
 
-### 7.2 创建与加入
+### 7.2 Create and join flow
 
 ```mermaid
 sequenceDiagram
@@ -310,11 +313,11 @@ sequenceDiagram
     WS-->>Client: connect message
 ```
 
-即使房间位于本机，`RemoteRpcRoomManager` 也通过统一 RPC client 调用本地 RPC server，从而保持单节点和多节点路径一致。
+Even for a local room, `RemoteRpcRoomManager` uses the local RPC client. This keeps the single-node and multi-node paths consistent.
 
-### 7.3 消息流
+### 7.3 Message flow
 
-客户端允许发送四类消息：
+Clients may send:
 
 ```text
 ping
@@ -323,7 +326,7 @@ message
 updateRoomInfo
 ```
 
-广播或单播链路：
+Broadcast and direct-message routing:
 
 ```mermaid
 flowchart LR
@@ -344,7 +347,7 @@ flowchart LR
     RemoteB --> ClientB
 ```
 
-`event.Package` 是房间消息跨节点传输的信封，包含：
+`event.Package` is the envelope used to move room messages across nodes. It carries:
 
 - `From`
 - `CreatedAt`
@@ -352,48 +355,48 @@ flowchart LR
 - `RoutingKey`
 - JSON `Content`
 
-### 7.4 状态与超时
+### 7.4 State and timeout behavior
 
-通用状态机包含：
+The shared state machine contains:
 
 ```text
 Init -> Running -> Close
              \-> Error
 ```
 
-房间管理器每 10 秒检查一次：
+Room managers inspect rooms every ten seconds:
 
-- 初始化后 1 分钟无人连接：关闭。
-- 运行中全部用户离开超过 1 分钟：关闭。
-- 运行中 5 分钟无活动：关闭。
-- 本地房间存在超过 1 小时：关闭。
-- remote room 无活动超过 20 秒或存在超过 1 小时：关闭。
+- An initialized room with no connections for one minute is closed.
+- A running room with no users for one minute is closed.
+- A running room with no activity for five minutes is closed.
+- A local room older than one hour is closed.
+- A remote room inactive for twenty seconds or older than one hour is closed.
 
-这些时间目前是代码常量，不在 `config.json` 中。
+These durations are code constants, not `config.json` fields.
 
-## 8. RPC 与集群通信
+## 8. RPC and cluster communication
 
-### 8.1 协议
+### 8.1 Protocol
 
-RPC server 使用 Gorilla RPC JSON codec：
+The RPC server uses the Gorilla RPC JSON codec:
 
 ```text
 POST http://<node-ip>:<rpc-port>/rpc
 Content-Type: application/json
 ```
 
-请求包含方法名、参数数组和递增 id。主要服务：
+Requests carry a method, one-element parameter array, and incrementing ID. Main services:
 
-| RPC 服务 | 用途 |
+| RPC service | Purpose |
 | --- | --- |
-| `LocalRpcRoomManager` | 房间创建、查询、更新、Join、Leave、删除。 |
-| `RpcEventEmitter` | 向目标节点上的连接投递事件。 |
-| `CoreApi` | 查询节点本地日志或日志组。 |
+| `LocalRpcRoomManager` | Create, query, update, join, leave, and remove rooms. |
+| `RpcEventEmitter` | Deliver an event to a connection on the target node. |
+| `CoreApi` | Query a node's local logs and log groups. |
 
-### 8.2 HTTP 代理与 RPC 的分工
+### 8.2 RPC versus HTTP proxying
 
-- 房间控制、事件消息、列表聚合使用 RPC。
-- 日志下载和删除在目标节点处理时使用 Echo 层反向代理。
+- Room control, event delivery, and list aggregation use RPC.
+- Log download and deletion use the Echo-level reverse proxy when the target is remote.
 
 ```mermaid
 flowchart TD
@@ -408,9 +411,9 @@ flowchart TD
     Self -- No --> Proxy
 ```
 
-## 9. 数据与存储
+## 9. Data and storage
 
-### 9.1 领域数据模型
+### 9.1 Domain data model
 
 ```mermaid
 erDiagram
@@ -445,18 +448,18 @@ erDiagram
     }
 ```
 
-GORM 启动时自动迁移 `LogGroup`、`LogData` 和 `Tag`。
+At startup, GORM migrates `LogGroup`, `LogData`, and `Tag`.
 
-日志状态：
+Log states:
 
 - `Created`
 - `Saved`
 - `Error`
 - `Unknown`
 
-正常创建流程最终写入 `Saved`。
+The normal creation path stores `Saved`.
 
-### 9.2 数据库选择
+### 9.2 Database selection
 
 ```mermaid
 flowchart TD
@@ -468,13 +471,13 @@ flowchart TD
     Config -- No --> SQLite
 ```
 
-SQLite 文件选择顺序：
+SQLite path order:
 
-1. 工作目录的 `data.db`。
-2. `data/data.db`。
-3. 不存在时创建 `data/data.db`。
+1. `data.db` in the working directory.
+2. `data/data.db`.
+3. Create `data/data.db` when neither exists.
 
-### 9.3 正文存储选择
+### 9.3 Log-body storage selection
 
 ```mermaid
 flowchart TD
@@ -486,103 +489,103 @@ flowchart TD
     Config -- No --> File
 ```
 
-`StorageApi` 统一提供：
+`StorageApi` exposes:
 
 - `SaveLog`
 - `GetLog`
 - `ExistLog`
 - `RemoveLog`
-- 通用路径的 `Save` / `Get` / `Exist`
+- Generic-path `Save`, `Get`, and `Exist`
 
-本地实现固定使用 `./log`。S3 实现使用 `baseDir/logDir/fileId`。
+The local implementation uses `./log`. The S3 implementation stores log bodies under `baseDir/logDir/fileId`.
 
-### 9.4 后台任务
+### 9.4 Background tasks
 
-| 任务 | 条件 | 周期 | 作用 |
+| Task | Condition | Interval | Purpose |
 | --- | --- | --- | --- |
-| `clean_file` | 本地文件存储 | 10 分钟 | 按总容量和创建时间清理日志。 |
-| `sync_data_file` | 远程对象存储 | 5 分钟 | 把本地 SQLite 文件同步到对象存储。 |
-| room manager loop | 始终 | 10 秒 | 清理超时或关闭房间。 |
+| `clean_file` | local file storage | 10 minutes | Remove logs by total capacity and creation time. |
+| `sync_data_file` | remote object storage | 5 minutes | Sync the local SQLite file to object storage. |
+| room manager loop | always | 10 seconds | Remove closed or timed-out rooms. |
 
-`metric` 包默认使用空实现，宿主程序可以调用 `metric.SetMetric` 注入监控系统。
+`metric` uses a no-op implementation by default. A host application can inject monitoring through `metric.SetMetric`.
 
-## 10. 静态资源服务
+## 10. Static files
 
-`StaticConfig.Files` 必须包含名为 `dist` 的目录。Echo 将该目录包装为 fallback 文件系统：
+`StaticConfig.Files` must contain a directory named `dist`. Echo wraps it in a fallback filesystem:
 
-- 文件存在：返回实际静态文件。
-- 文件不存在：返回 `index.html`，支持前端 history 路由。
+- Existing paths return the corresponding static file.
+- Missing paths return `index.html` for frontend history routing.
 
-缓存中间件只用于静态资源通配路由，不影响 `/api/v1`。
+The cache middleware is attached only to the static wildcard route, not `/api/v1`.
 
-## 11. 扩展指南
+## 11. Extension guide
 
-### 11.1 新增 HTTP API
+### 11.1 Add an HTTP API
 
-1. 在 `serve/route/route.go` 选择公共或受保护路由组。
-2. 复杂业务逻辑放入 `CoreApi` 或独立领域服务，不要堆在 handler。
-3. 使用 `common.NewSuccessResponse` 和统一错误中间件。
-4. 明确多实例下是本地操作、RPC 聚合还是 HTTP 代理。
-5. 增加参数、鉴权、错误路径和多节点测试。
+1. Choose the public or protected group in `serve/route/route.go`.
+2. Keep complex logic in `CoreApi` or a dedicated domain service.
+3. Use `common.NewSuccessResponse` and the common error middleware.
+4. Decide whether the operation is local, RPC-aggregated, or HTTP-proxied in a cluster.
+5. Add parameter, authentication, error-path, and multi-node tests.
 
-### 11.2 新增 WebSocket 消息
+### 11.2 Add a WebSocket message
 
-1. 在 `api/room/room.go` 添加类型常量和 content 结构。
-2. 更新 `NewMessageContent`。
-3. 决定是否加入 `IsPublicMessageType`。
-4. 在 `remoteRoom` 和/或 `localRoom` 实现路由。
-5. 确认 `roomMessageToPackage`、`packageToRoomMessage` 可以序列化。
-6. 补充本地、跨节点、畸形消息和关闭场景测试。
+1. Add a type constant and content structure in `api/room/room.go`.
+2. Update `NewMessageContent`.
+3. Decide whether `IsPublicMessageType` should accept it.
+4. Implement routing in `remoteRoom` and/or `localRoom`.
+5. Verify `roomMessageToPackage` and `packageToRoomMessage` serialization.
+6. Test local, cross-node, malformed-message, and shutdown paths.
 
-### 11.3 新增存储实现
+### 11.3 Add a storage implementation
 
-实现 `storage.StorageApi`，并在 `storage.NewStorage` 中根据显式配置选择实现。需要保持：
+Implement `storage.StorageApi` and select it explicitly in `storage.NewStorage`. Preserve:
 
-- file ID 和对象 key 稳定。
-- `Get` 返回的 reader 由调用方关闭。
-- 不存在对象与真正存储错误可区分。
-- 文件正文与数据库元数据的失败补偿策略明确。
+- Stable file IDs and object keys.
+- Caller ownership of readers returned by `Get`.
+- A distinction between missing objects and actual storage failures.
+- A defined compensation strategy when body and metadata operations partially fail.
 
-### 11.4 新增数据库
+### 11.4 Add a database implementation
 
-`data.DataApi` 是领域边界。新增数据库实现时要保持：
+`data.DataApi` is the domain boundary. A new implementation must preserve:
 
-- 时间范围使用 Unix 秒输入。
-- tag 多条件查询语义一致。
-- 分页从 1 开始。
-- GORM JSON 模型兼容。
-- 集群聚合时 `Page.Merge`、排序和去重行为一致。
+- Unix-second input for time ranges.
+- Consistent multi-tag query semantics.
+- One-based pagination.
+- Compatible JSON models.
+- `Page.Merge`, ordering, and deduplication behavior during cluster aggregation.
 
-## 12. 设计约束与风险边界
+## 12. Constraints and risk boundaries
 
-当前实现需要特别关注：
+The current implementation has important boundaries:
 
-- 认证关闭是默认行为，公共上传和 WebSocket 路由也不经过 JWT 中间件。
-- RPC 监听所有网卡，没有内建认证和 TLS，必须依赖网络隔离。
-- HTTP、WebSocket 请求体没有统一大小和速率限制。
-- 文件正文与数据库元数据不是同一事务。
-- 跨节点列表由每个节点先分页再合并，不等同于严格的全局分页。
-- 跨节点 RPC 目前顺序执行，一个节点失败会使整体调用失败。
-- S3 模式同步活动 SQLite 文件；多节点共享同一快照对象存在覆盖风险。
-- 全局 container、logger 和 metric 使用进程级状态，测试需要注意隔离。
-- 部分构造函数会立即启动 goroutine 或监听端口，不是纯对象构造。
+- Authentication is off by default, and public upload and WebSocket routes do not use JWT middleware.
+- RPC listens on all interfaces and has no built-in authentication or TLS.
+- HTTP and WebSocket bodies have no common size or rate limit.
+- File bodies and database metadata do not share a transaction.
+- Cross-node lists paginate on each node before merging, which is not strict global pagination.
+- Cross-node RPC runs sequentially, and one node failure fails the whole operation.
+- S3 mode syncs an active SQLite file; multiple nodes can overwrite a shared snapshot.
+- The global container, logger, and metric instances are process-wide and require test isolation.
+- Some constructors immediately start goroutines or listeners and are not pure constructors.
 
-涉及上述边界的修改应先形成迁移方案和兼容性说明，再进入实现。
+Changes around these boundaries require an explicit compatibility and migration plan.
 
-## 13. 关键源码入口
+## 13. Key source entry points
 
-| 关注点 | 入口 |
+| Concern | Entry points |
 | --- | --- |
-| 进程启动 | `bin/main.go`, `serve/run.go` |
-| 依赖图 | `container/container.go` |
-| 配置加载 | `config/load.go`, `config/config.go` |
-| HTTP 路由 | `serve/route/route.go` |
-| 日志领域逻辑 | `serve/route/core.go` |
-| WebSocket 会话 | `serve/socket/socket.go` |
-| 房间管理 | `room/local_manager.go`, `room/rpc_remote_manager.go` |
-| 房间消息 | `room/local_room.go`, `room/remote_room.go`, `room/message.go` |
-| 事件路由 | `event/local_event.go`, `event/rpc_event.go` |
-| RPC 拓扑 | `rpc/address.go`, `rpc/rpc.go`, `rpc/rpc_client.go` |
-| 数据库 | `data/db.go`, `data/logs.go` |
-| 文件/S3 | `storage/file.go`, `storage/s3.go` |
-| 周期任务 | `task/task.go` |
+| Process startup | `bin/main.go`, `serve/run.go` |
+| Dependency graph | `container/container.go` |
+| Configuration | `config/load.go`, `config/config.go` |
+| HTTP routes | `serve/route/route.go` |
+| Log-domain logic | `serve/route/core.go` |
+| WebSocket sessions | `serve/socket/socket.go` |
+| Room management | `room/local_manager.go`, `room/rpc_remote_manager.go` |
+| Room messages | `room/local_room.go`, `room/remote_room.go`, `room/message.go` |
+| Event routing | `event/local_event.go`, `event/rpc_event.go` |
+| RPC topology | `rpc/address.go`, `rpc/rpc.go`, `rpc/rpc_client.go` |
+| Database | `data/db.go`, `data/logs.go` |
+| Local/S3 storage | `storage/file.go`, `storage/s3.go` |
+| Periodic tasks | `task/task.go` |
