@@ -57,7 +57,7 @@ func InitData(cfg *config.Config, gormConfig *gorm.Config) (*Data, error) {
 
 	// 如果配置了 MySQL URL，使用 MySQL，否则使用 SQLite
 	if cfg.DatabaseConfig != nil && cfg.DatabaseConfig.MySQLURL != "" {
-		logger.Infof("init database with MySQL: %s", cfg.DatabaseConfig.MySQLURL)
+		logger.Info("init database with MySQL")
 		db, err = gorm.Open(mysql.Open(cfg.DatabaseConfig.MySQLURL), gormConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to MySQL database: %w", err)
@@ -358,14 +358,22 @@ type LogGroupResult struct {
 	Total int64  `json:"total"`
 }
 
+func monthGroupExpression(dialect string) string {
+	if dialect == "mysql" {
+		return "DATE_FORMAT(log_data.created_at, '%Y-%m')"
+	}
+	return "strftime('%Y-%m', log_data.created_at)"
+}
+
 func (d *Data) CountLogsGroup(tagKey string) ([]LogGroupResult, error) {
 	var results []LogGroupResult
+	dateExpression := monthGroupExpression(d.db.Dialector.Name())
 	err := d.db.Model(&LogData{}).
-		Select("strftime('%Y-%m', log_data.created_at) as date, tags.value as tag, count(*) as total").
+		Select(dateExpression+" as date, tags.value as tag, count(*) as total").
 		Joins("JOIN log_tags ON log_data.id = log_tags.log_data_id").
 		Joins("JOIN tags ON tags.id = log_tags.tag_id").
 		Where("tags.key = ?", tagKey).
-		Group("strftime('%Y-%m', log_data.created_at), tags.value").
+		Group(dateExpression + ", tags.value").
 		Order("date").
 		Find(&results).Error
 
