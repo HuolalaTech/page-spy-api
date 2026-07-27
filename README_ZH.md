@@ -26,6 +26,12 @@
 
 该仓库是 [HuolalaTech/page-spy-web][main-repo] 的后端服务，其中包括静态资源服务，http 服务以及 websocket 服务。
 
+## 项目文档
+
+- [使用指南](./docs/USAGE.md)
+- [开发与测试指南](./docs/DEVELOPMENT.md)
+- [项目结构与设计](./docs/ARCHITECTURE.md)
+
 ## 如何使用
 
 ```golang
